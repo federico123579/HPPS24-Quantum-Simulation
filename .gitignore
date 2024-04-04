@@ -1,1 +1,6 @@
-/target
+# Rust
+target/
+
+# Python
+.venv/
+.ipynb_checkpoints/

@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 use nalgebra::{Complex, ComplexField, DMatrix, DVector, Matrix2, Vector2};
 
 mod dag;
@@ -68,6 +66,9 @@ struct Gate {
 impl From<KnownGates> for Gate {
     fn from(gate: KnownGates) -> Self {
         match gate {
+            KnownGates::Identity => Gate {
+                matrix_repr: Matrix2::identity(),
+            },
             KnownGates::PauliX => Gate {
                 matrix_repr: Matrix2::new(0.0.into(), 1.0.into(), 1.0.into(), 0.0.into()),
             },
@@ -79,20 +80,23 @@ impl From<KnownGates> for Gate {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 enum KnownGates {
+    #[default]
+    Identity,
     PauliX,
     Hadamard,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct Block {
     matrix_repr: DMatrix<Complex<f64>>,
 }
 
 impl Block {
-    fn tensor_product(self, rhs: Block) -> Block {
+    fn tensor_product(&self, rhs: &Block) -> Block {
         Block {
-            matrix_repr: self.as_ref().kronecker(&rhs),
+            matrix_repr: self.as_ref().kronecker(rhs.as_ref()),
         }
     }
 }
@@ -103,24 +107,24 @@ impl AsRef<DMatrix<Complex<f64>>> for Block {
     }
 }
 
-impl Deref for Block {
-    type Target = DMatrix<Complex<f64>>;
+// impl Deref for Block {
+//     type Target = DMatrix<Complex<f64>>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.matrix_repr
-    }
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.matrix_repr
+//     }
+// }
 
-impl DerefMut for Block {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.matrix_repr
-    }
-}
+// impl DerefMut for Block {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.matrix_repr
+//     }
+// }
 
-impl std::ops::Mul<Block> for Block {
+impl std::ops::Mul<&Block> for &Block {
     type Output = Block;
 
-    fn mul(self, rhs: Block) -> Self::Output {
+    fn mul(self, rhs: &Block) -> Self::Output {
         Block {
             matrix_repr: self.as_ref() * rhs.as_ref(),
         }
@@ -172,14 +176,26 @@ impl<G: Into<Gate>> From<G> for Block {
 }
 
 fn main() {
-    let block = Block::from(KnownGates::PauliX).tensor_product(KnownGates::PauliX.into());
-    println!("Block: {}", block);
+    let a_block = Block::from(KnownGates::PauliX);
+    let b_block = Block::from(KnownGates::Identity);
+    let c_block = a_block.tensor_product(&b_block);
+    println!("Block A: {}", a_block);
+    println!("Block B: {}", b_block);
+    println!("Block C: {}", c_block);
 
-    let phi = Qubit::new(1.0.into(), 0.0.into());
-    let psi = Qubit::new(0.0.into(), 1.0.into());
-    let qreg = QRegister::from([phi, psi]);
-    println!("Initial: {}", qreg);
+    let phi = Qubit::new(Complex::i(), 0.0.into());
+    let psi = Qubit::new(0.0.into(), (-1.0).into());
+    let a_reg = QRegister::from([phi.clone()]);
+    let b_reg = QRegister::from([psi.clone()]);
+    let c_reg = QRegister::from([phi, psi]);
+    println!("Initial A: {}", a_reg);
+    println!("Initial B: {}", b_reg);
+    println!("Initial C: {}", c_reg);
 
-    let qreg = block * qreg;
-    println!("After gate: {}", qreg);
+    let a_reg = a_block * a_reg;
+    let b_reg = b_block * b_reg;
+    let c_reg = c_block * c_reg;
+    println!("A After gate: {}", a_reg);
+    println!("B After gate: {}", b_reg);
+    println!("C After gate: {}", c_reg);
 }
