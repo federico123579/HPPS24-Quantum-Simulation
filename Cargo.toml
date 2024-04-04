@@ -1,0 +1,3 @@
+[workspace]
+members = ["qcs-core"]
+resolver = "2"
