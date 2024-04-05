@@ -1,5 +1,9 @@
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
 
+// @@@@@@@@@@@@
+// @@ Qubits @@
+// @@@@@@@@@@@@
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Qubit {
     amplitudes: Vector2<Complex<f64>>,
@@ -12,7 +16,19 @@ impl Qubit {
         }
     }
 
-    pub fn probabilities(&self) -> Vector2<f64> {
+    pub fn zero() -> Self {
+        Qubit {
+            amplitudes: Vector2::new(Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)),
+        }
+    }
+
+    pub fn one() -> Self {
+        Qubit {
+            amplitudes: Vector2::new(Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)),
+        }
+    }
+
+    pub fn distr(&self) -> Vector2<f64> {
         self.amplitudes.map(|x| x.norm_sqr())
     }
 }
@@ -26,6 +42,13 @@ impl std::fmt::Display for Qubit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct QRegister {
     qubits: DVector<Complex<f64>>,
+}
+
+impl QRegister {
+    pub fn distr(&self) -> DVector<f64> {
+        let iter = self.qubits.iter().map(|x| x.norm_sqr());
+        DVector::from_iterator(self.qubits.len(), iter)
+    }
 }
 
 impl std::fmt::Display for QRegister {
@@ -57,8 +80,12 @@ impl<const N: usize> From<[Qubit; N]> for QRegister {
     }
 }
 
+// @@@@@@@@@@@
+// @@ Gates @@
+// @@@@@@@@@@@
+
 #[derive(Debug, Clone, Copy, Default)]
-pub enum KnownGates {
+pub enum GateKind {
     #[default]
     Identity,
     PauliX,
@@ -139,19 +166,19 @@ impl std::fmt::Display for Block {
     }
 }
 
-impl From<KnownGates> for Block {
-    fn from(gate: KnownGates) -> Self {
+impl From<GateKind> for Block {
+    fn from(gate: GateKind) -> Self {
         match gate {
-            KnownGates::Identity => Block {
+            GateKind::Identity => Block {
                 matrix_repr: DMatrix::identity(2, 2),
                 dim: 2,
             },
-            KnownGates::PauliX => Block {
+            GateKind::PauliX => Block {
                 matrix_repr: DMatrix::from_row_slice(2, 2, &[0.0, 1.0, 1.0, 0.0])
                     .map(|x| Complex::new(x, 0.0)),
                 dim: 2,
             },
-            KnownGates::Hadamard => Block {
+            GateKind::Hadamard => Block {
                 matrix_repr: DMatrix::from_row_slice(
                     2,
                     2,
