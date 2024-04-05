@@ -68,14 +68,10 @@ impl From<Qubit> for QRegister {
 impl<const N: usize> From<[Qubit; N]> for QRegister {
     fn from(qubits: [Qubit; N]) -> Self {
         QRegister {
-            qubits: qubits.into_iter().map(|q| q.amplitudes).enumerate().fold(
-                DVector::zeros(N * 2),
-                |mut acc, (i, q)| {
-                    acc[i * 2] = q[0];
-                    acc[i * 2 + 1] = q[1];
-                    acc
-                },
-            ),
+            qubits: qubits
+                .into_iter()
+                .map(|q| q.amplitudes)
+                .fold(DVector::identity(1), |acc, q| acc.kronecker(&q)),
         }
     }
 }
