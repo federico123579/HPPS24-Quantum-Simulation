@@ -102,8 +102,8 @@ pub enum GateKind {
     CNOTup,
     /// Controlled-NOT Gate (CNOT, CX, CNOT) - controlled is down
     CNOTdown,
-    /// Controlled-Z Gate (CZ, CZ, CZ)
-    CZ,
+    /// Controlled-Z Gate (CZ)
+    ConZ,
     /// Swap Gate (SWAP)
     Swap,
     /// Toffoli Gate (CCNOT, CCX, TOFF)
@@ -320,7 +320,7 @@ impl From<GateKind> for Block {
                     dim: 4,
                 }
             }
-            GateKind::CZ => {
+            GateKind::ConZ => {
                 let cz = DMatrix::from_row_slice(
                     4,
                     4,
