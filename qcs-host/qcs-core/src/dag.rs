@@ -1,23 +1,35 @@
 use std::{cell::RefCell, rc::Rc};
 
-type NodeRef<I> = Rc<RefCell<Node<I>>>;
-
 #[derive(Debug, Clone)]
 struct Node<I> {
     item: I,
-    next: Vec<NodeRef<I>>,
+    ingoing: Vec<Rc<RefCell<Node<I>>>>,
+    outgoing: Vec<Rc<RefCell<Node<I>>>>,
 }
 
 impl<I> Node<I> {
     fn new_rc(item: I) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Node {
             item,
-            next: Vec::new(),
+            ingoing: Vec::new(),
+            outgoing: Vec::new(),
         }))
     }
 
-    fn link_front(&mut self, next: Rc<RefCell<Self>>) {
-        self.next.push(next);
+    fn add_outgoing(&mut self, next: Rc<RefCell<Self>>) {
+        self.outgoing.push(next);
+    }
+
+    fn add_ingoing(&mut self, prev: Rc<RefCell<Self>>) {
+        self.ingoing.push(prev);
+    }
+
+    fn get_outgoing(&self) -> &[Rc<RefCell<Self>>] {
+        &self.outgoing
+    }
+
+    fn get_ingoing(&self) -> &[Rc<RefCell<Self>>] {
+        &self.ingoing
     }
 }
 
@@ -33,13 +45,13 @@ mod tests {
         let d = Node::new_rc('d');
         let e = Node::new_rc('e');
 
-        a.borrow_mut().link_front(b.clone());
-        a.borrow_mut().link_front(c.clone());
-        a.borrow_mut().link_front(d.clone());
-        b.borrow_mut().link_front(d.clone());
-        c.borrow_mut().link_front(d.clone());
-        c.borrow_mut().link_front(e.clone());
-        d.borrow_mut().link_front(e.clone());
+        a.borrow_mut().add_outgoing(b.clone());
+        a.borrow_mut().add_outgoing(c.clone());
+        a.borrow_mut().add_outgoing(d.clone());
+        b.borrow_mut().add_outgoing(d.clone());
+        c.borrow_mut().add_outgoing(d.clone());
+        c.borrow_mut().add_outgoing(e.clone());
+        d.borrow_mut().add_outgoing(e.clone());
 
         println!("{:?}", a);
     }

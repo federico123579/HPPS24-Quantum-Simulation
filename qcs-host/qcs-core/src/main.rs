@@ -4,28 +4,19 @@ mod dag;
 mod model;
 
 fn main() {
-    let a_block = Block::from(GateKind::PauliX);
-    let b_block = Block::from(GateKind::Hadamard);
-    let c_block = a_block.tensor_product(&b_block);
-    println!("Block A: {}", a_block);
-    println!("Block B: {}", b_block);
-    println!("Block C: {}", c_block);
+    let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
 
-    let phi = Qubit::zero();
-    let psi = Qubit::zero();
-    let a_reg = QRegister::from([phi.clone()]);
-    let b_reg = QRegister::from([psi.clone()]);
-    let c_reg = QRegister::from([phi, psi]);
-    println!("Initial A: {}", a_reg);
-    println!("Initial B: {}", b_reg);
-    println!("Initial C: {}", c_reg);
+    let i_block = Block::from(GateKind::Identity);
+    let x_block = Block::from(GateKind::PauliX);
+    let h_block = Block::from(GateKind::Hadamard);
+    let cnot_block = Block::from(GateKind::CNOTup);
 
-    let a_reg = a_block * a_reg;
-    let b_reg = b_block * b_reg;
-    let c_reg = c_block * c_reg;
-    println!("A After gate: {}", a_reg);
-    println!("B After gate: {}", b_reg);
-    println!("C After gate: {}", c_reg);
+    let t1 = i_block.tensor_product(&x_block);
+    let t2 = h_block.tensor_product(&h_block);
+    let t3 = cnot_block;
+    let t4 = h_block.tensor_product(&i_block);
 
-    println!("{}", c_reg.distr());
+    let qstate = t1 * t2 * t3 * t4 * inr;
+
+    println!("{}", qstate);
 }
