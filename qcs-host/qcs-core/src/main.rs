@@ -1,7 +1,8 @@
 use crate::model::{Block, GateKind, QRegister, Qubit};
 
-mod dag;
+mod contractions;
 mod model;
+mod tree;
 
 fn main() {
     let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
