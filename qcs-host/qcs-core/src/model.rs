@@ -1,6 +1,9 @@
 use std::{f64::consts::FRAC_PI_4, ops::Range};
 
+use enum_dispatch::enum_dispatch;
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
+
+use crate::contractions::ContractionGraph;
 
 // @@@@@@@@@@@@
 // @@ Qubits @@
@@ -83,37 +86,55 @@ impl<const N: usize> From<[Qubit; N]> for QRegister {
 // @@@@@@@@@@@
 
 #[derive(Debug, Clone, Copy)]
-struct IdentityGate;
-#[derive(Debug, Clone, Copy)]
-struct PauliXGate;
-#[derive(Debug, Clone, Copy)]
-struct PauliYGate;
-#[derive(Debug, Clone, Copy)]
-struct PauliZGate;
-#[derive(Debug, Clone, Copy)]
-struct HadamardGate;
-#[derive(Debug, Clone, Copy)]
-struct PhaseGate;
-#[derive(Debug, Clone, Copy)]
-struct Pi8Gate;
-#[derive(Debug, Clone, Copy)]
-struct CNOTupGate;
-#[derive(Debug, Clone, Copy)]
-struct CNOTdownGate;
-#[derive(Debug, Clone, Copy)]
-struct ConZGate;
-#[derive(Debug, Clone, Copy)]
-struct SwapGate;
-#[derive(Debug, Clone, Copy)]
-struct ToffoliGate;
+#[enum_dispatch(QuantumGate)]
+pub enum Gate {
+    Identity(IdentityGate),
+    PauliX(PauliXGate),
+    PauliY(PauliYGate),
+    PauliZ(PauliZGate),
+    Hadamard(HadamardGate),
+    Phase(PhaseGate),
+    Pi8(Pi8Gate),
+    CNOTup(CNOTupGate),
+    CNOTdown(CNOTdownGate),
+    ConZ(ConZGate),
+    Swap(SwapGate),
+    Toffoli(ToffoliGate),
+}
 
+#[derive(Debug, Clone, Copy)]
+pub struct IdentityGate;
+#[derive(Debug, Clone, Copy)]
+pub struct PauliXGate;
+#[derive(Debug, Clone, Copy)]
+pub struct PauliYGate;
+#[derive(Debug, Clone, Copy)]
+pub struct PauliZGate;
+#[derive(Debug, Clone, Copy)]
+pub struct HadamardGate;
+#[derive(Debug, Clone, Copy)]
+pub struct PhaseGate;
+#[derive(Debug, Clone, Copy)]
+pub struct Pi8Gate;
+#[derive(Debug, Clone, Copy)]
+pub struct CNOTupGate;
+#[derive(Debug, Clone, Copy)]
+pub struct CNOTdownGate;
+#[derive(Debug, Clone, Copy)]
+pub struct ConZGate;
+#[derive(Debug, Clone, Copy)]
+pub struct SwapGate;
+#[derive(Debug, Clone, Copy)]
+pub struct ToffoliGate;
+
+#[enum_dispatch]
 pub trait QuantumGate {
     fn matrix(&self) -> DMatrix<Complex<f64>>;
-    fn dim(&self) -> usize;
+    fn rank(&self) -> u8;
     fn block(&self) -> Block {
         Block {
             matrix_repr: self.matrix(),
-            dim: self.dim(),
+            dim: self.rank() as usize,
         }
     }
 }
@@ -125,7 +146,7 @@ impl<G: QuantumGate> From<G> for Block {
 }
 
 impl QuantumGate for IdentityGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -135,7 +156,7 @@ impl QuantumGate for IdentityGate {
 }
 
 impl QuantumGate for PauliXGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -145,7 +166,7 @@ impl QuantumGate for PauliXGate {
 }
 
 impl QuantumGate for PauliYGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -155,7 +176,7 @@ impl QuantumGate for PauliYGate {
 }
 
 impl QuantumGate for PauliZGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -165,7 +186,7 @@ impl QuantumGate for PauliZGate {
 }
 
 impl QuantumGate for HadamardGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -176,7 +197,7 @@ impl QuantumGate for HadamardGate {
 }
 
 impl QuantumGate for PhaseGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -186,7 +207,7 @@ impl QuantumGate for PhaseGate {
 }
 
 impl QuantumGate for Pi8Gate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         1
     }
 
@@ -200,7 +221,7 @@ impl QuantumGate for Pi8Gate {
 }
 
 impl QuantumGate for CNOTupGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         2
     }
 
@@ -217,7 +238,7 @@ impl QuantumGate for CNOTupGate {
 }
 
 impl QuantumGate for CNOTdownGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         2
     }
 
@@ -234,7 +255,7 @@ impl QuantumGate for CNOTdownGate {
 }
 
 impl QuantumGate for ConZGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         2
     }
 
@@ -251,7 +272,7 @@ impl QuantumGate for ConZGate {
 }
 
 impl QuantumGate for SwapGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         2
     }
 
@@ -268,7 +289,7 @@ impl QuantumGate for SwapGate {
 }
 
 impl QuantumGate for ToffoliGate {
-    fn dim(&self) -> usize {
+    fn rank(&self) -> u8 {
         3
     }
 
@@ -291,9 +312,10 @@ impl QuantumGate for ToffoliGate {
 // @@ Circuit @@
 // @@@@@@@@@@@@@
 
+#[derive(Debug, Clone)]
 pub struct QuantumCircuit {
-    n_qubits: usize,
-    gates: Vec<(Box<dyn QuantumGate>, Range<usize>)>,
+    pub n_qubits: usize,
+    pub gates: Vec<GateOnLanes>,
 }
 
 impl QuantumCircuit {
@@ -305,57 +327,70 @@ impl QuantumCircuit {
     }
 
     pub fn g_id(&mut self, qix: usize) {
-        self.gates.push((Box::new(IdentityGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(IdentityGate, qix));
     }
 
     pub fn g_x(&mut self, qix: usize) {
-        self.gates.push((Box::new(PauliXGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(PauliXGate, qix));
     }
 
     pub fn g_y(&mut self, qix: usize) {
-        self.gates.push((Box::new(PauliYGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(PauliYGate, qix));
     }
 
     pub fn g_z(&mut self, qix: usize) {
-        self.gates.push((Box::new(PauliZGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(PauliZGate, qix));
     }
 
     pub fn g_h(&mut self, qix: usize) {
-        self.gates.push((Box::new(HadamardGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(HadamardGate, qix));
     }
 
     pub fn g_s(&mut self, qix: usize) {
-        self.gates.push((Box::new(PhaseGate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(PhaseGate, qix));
     }
 
     pub fn g_t(&mut self, qix: usize) {
-        self.gates.push((Box::new(Pi8Gate), qix..qix + 1));
+        assert!(qix < self.n_qubits);
+        self.gates.push(GateOnLanes::at(Pi8Gate, qix));
     }
 
     pub fn g_cxu(&mut self, qixr: Range<usize>) {
-        self.gates.push((Box::new(CNOTupGate), qixr));
+        assert!(qixr.end <= self.n_qubits);
+        self.gates.push(GateOnLanes::new(CNOTupGate, qixr));
     }
 
     pub fn g_cxd(&mut self, qixr: Range<usize>) {
-        self.gates.push((Box::new(CNOTdownGate), qixr));
+        assert!(qixr.end <= self.n_qubits);
+        self.gates.push(GateOnLanes::new(CNOTdownGate, qixr));
     }
 
     pub fn g_cz(&mut self, qixr: Range<usize>) {
-        self.gates.push((Box::new(ConZGate), qixr));
+        assert!(qixr.end <= self.n_qubits);
+        self.gates.push(GateOnLanes::new(ConZGate, qixr));
     }
 
     pub fn g_swap(&mut self, qixr: Range<usize>) {
-        self.gates.push((Box::new(SwapGate), qixr));
+        assert!(qixr.end <= self.n_qubits);
+        self.gates.push(GateOnLanes::new(SwapGate, qixr));
     }
 
     pub fn g_toff(&mut self, qixr: Range<usize>) {
-        self.gates.push((Box::new(ToffoliGate), qixr));
+        assert!(qixr.end <= self.n_qubits);
+        self.gates.push(GateOnLanes::new(ToffoliGate, qixr));
     }
 
-    pub fn eval(&self) -> Block {
+    pub fn eval(self) -> Block {
+        let Self { n_qubits, gates } = self;
         let mut circuit =
-            (0..self.n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(IdentityGate));
-        for (gate, qrange) in self.gates.iter() {
+            (0..n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(IdentityGate));
+        for (gate, qrange) in gates.into_iter().map(|g| g.deconstruct()) {
             let mut gate_block = gate.block();
             // FIXME: this works only for 1-qubit gates
             let mut new_block = Block::one();
@@ -370,6 +405,45 @@ impl QuantumCircuit {
             circuit = &circuit * &gate_block;
         }
         circuit
+    }
+
+    pub fn into_contraction_graph(self) -> ContractionGraph {
+        self.into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GateOnLanes {
+    pub gate: Gate,
+    pub lanes: Range<usize>,
+}
+
+impl GateOnLanes {
+    pub fn new(gate: impl Into<Gate>, lanes: Range<usize>) -> Self {
+        GateOnLanes {
+            gate: gate.into(),
+            lanes,
+        }
+    }
+
+    pub fn at(gate: impl Into<Gate>, lane: usize) -> Self {
+        Self::new(gate, lane..lane + 1)
+    }
+
+    pub fn deconstruct(self) -> (Gate, Range<usize>) {
+        (self.gate, self.lanes)
+    }
+
+    pub fn rank(&self) -> u8 {
+        self.gate.rank()
+    }
+
+    pub fn block(&self) -> Block {
+        self.gate.block()
+    }
+
+    pub fn lanes(&self) -> Range<usize> {
+        self.lanes.clone()
     }
 }
 

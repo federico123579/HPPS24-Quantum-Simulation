@@ -14,8 +14,10 @@ fn main() {
     circ.g_h(0);
     circ.g_h(1);
 
-    let circ_eval = circ.eval();
-    let qstate = circ_eval * inr;
+    let circ_eval = circ.clone().eval();
+    let contr_graph = circ.into_contraction_graph();
+    println!("{}", contr_graph);
 
-    println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
+    let qstate = circ_eval * inr;
+    // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
 }
