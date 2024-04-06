@@ -3,7 +3,7 @@ use std::{f64::consts::FRAC_PI_4, ops::Range};
 use enum_dispatch::enum_dispatch;
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
 
-use crate::contractions::ContractionGraph;
+use crate::contractions::TensorNetwork;
 
 // @@@@@@@@@@@@
 // @@ Qubits @@
@@ -100,6 +100,25 @@ pub enum Gate {
     ConZ(ConZGate),
     Swap(SwapGate),
     Toffoli(ToffoliGate),
+}
+
+impl std::fmt::Display for Gate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Gate::Identity(_) => write!(f, "I"),
+            Gate::PauliX(_) => write!(f, "X"),
+            Gate::PauliY(_) => write!(f, "Y"),
+            Gate::PauliZ(_) => write!(f, "Z"),
+            Gate::Hadamard(_) => write!(f, "H"),
+            Gate::Phase(_) => write!(f, "S"),
+            Gate::Pi8(_) => write!(f, "T"),
+            Gate::CNOTup(_) => write!(f, "CNOTU"),
+            Gate::CNOTdown(_) => write!(f, "CNOTD"),
+            Gate::ConZ(_) => write!(f, "CZ"),
+            Gate::Swap(_) => write!(f, "SWAP"),
+            Gate::Toffoli(_) => write!(f, "TOFF"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -407,7 +426,7 @@ impl QuantumCircuit {
         circuit
     }
 
-    pub fn into_contraction_graph(self) -> ContractionGraph {
+    pub fn into_contraction_graph(self) -> TensorNetwork {
         self.into()
     }
 }
@@ -444,6 +463,18 @@ impl GateOnLanes {
 
     pub fn lanes(&self) -> Range<usize> {
         self.lanes.clone()
+    }
+}
+
+impl std::fmt::Display for GateOnLanes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}[{}:{}]",
+            self.gate,
+            self.lanes.start,
+            self.lanes.end - 1
+        )
     }
 }
 

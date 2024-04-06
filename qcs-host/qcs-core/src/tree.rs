@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct BTree<T> {
     root: Option<Node<T>>,
 }
@@ -7,8 +8,14 @@ impl<T> BTree<T> {
         Self { root: None }
     }
 
+    pub fn with_root(value: T) -> Self {
+        Self {
+            root: Some(Node::new(value)),
+        }
+    }
+
     /// Crate a new BTree with this tree as the left child and the other tree as the right child.
-    fn implant_sx(self, new_root: T, other: BTree<T>) -> Self {
+    pub fn implant_sx(self, new_root: T, other: BTree<T>) -> Self {
         let mut new_root = Node::new(new_root);
         new_root.left = self.root.map(Box::new);
         new_root.right = other.root.map(Box::new);
@@ -32,6 +39,7 @@ impl<T> BTree<T> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Node<T> {
     value: T,
     left: Option<Box<Node<T>>>,
