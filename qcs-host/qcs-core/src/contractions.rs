@@ -1,6 +1,10 @@
 use either::Either;
 use hashbrown::HashSet;
-use petgraph::{graph::EdgeReference, visit::EdgeRef, Directed, Direction, Graph};
+use petgraph::{
+    graph::{EdgeIndex, EdgeReference, NodeIndex},
+    visit::{EdgeRef, IntoNodeIdentifiers, IntoNodeReferences},
+    Directed, Direction, Graph,
+};
 
 use crate::model::{GateOnLanes, QuantumCircuit};
 
@@ -10,52 +14,100 @@ pub struct TensorNetwork {
 }
 
 impl TensorNetwork {
-    fn find_edges(&self, rank: u8) -> Vec<EdgeReference<u8>> {
+    #[inline]
+    fn edge_w(&self, edge: EdgeIndex) -> u8 {
+        *self.graph.edge_weight(edge).unwrap()
+    }
+
+    #[inline]
+    fn edge_source(&self, edge: EdgeIndex) -> NodeIndex {
+        self.graph.edge_endpoints(edge).unwrap().0
+    }
+
+    #[inline]
+    fn edge_target(&self, edge: EdgeIndex) -> NodeIndex {
+        self.graph.edge_endpoints(edge).unwrap().1
+    }
+
+    fn find_edges(&self, rank: u8) -> Vec<EdgeIndex> {
         self.graph
-            .edge_references()
-            .filter(|e| *e.weight() == rank)
+            .edge_indices()
+            .filter(|e| self.edge_w(*e) == rank)
             .collect::<Vec<_>>()
     }
 
-    fn find_disjoint_edges(&self, rank: u8) -> Vec<EdgeReference<u8>> {
+    fn find_disjoint_edges(&self, rank: u8) -> Vec<EdgeIndex> {
         let mut visited = HashSet::new();
         self.find_edges(rank)
             .into_iter()
-            .filter(|e| visited.insert(e.source()) && visited.insert(e.target()))
+            .filter(|e| {
+                visited.insert(self.edge_source(*e)) && visited.insert(self.edge_target(*e))
+            })
             .collect()
     }
 
-    fn contract_edge(&mut self, edge: &EdgeReference<u8>) {
-        let ew = *edge.weight();
-        let source = edge.source();
-        let target = edge.target();
+    fn contract_edge(&mut self, edge: EdgeIndex) {
+        let ew = self.edge_w(edge);
+        let source = self.edge_source(edge);
+        let target = self.edge_target(edge);
 
         // Get the nodes linked to the source and target nodes
-        let source_linked_nodes = self
+        let backlinks = self
             .graph
             .edges_directed(source, Direction::Incoming)
+            .chain(
+                self.graph
+                    .edges_directed(target, Direction::Incoming)
+                    .filter(|e| e.source() != source),
+            )
             .map(|e| (e.source(), *e.weight()))
             .collect::<Vec<_>>();
-        let target_linked_nodes = self
+        let frontlinks = self
             .graph
             .edges_directed(target, Direction::Outgoing)
+            .chain(
+                self.graph
+                    .edges_directed(source, Direction::Outgoing)
+                    .filter(|e| e.target() != target),
+            )
             .map(|e| (e.target(), *e.weight()))
             .collect::<Vec<_>>();
 
-        // Remove the source and target nodes
-        let source_contr = self.graph.remove_node(source).unwrap();
-        let target_contr = self.graph.remove_node(target).unwrap();
+        let source_contr = self.graph.node_weight(source).unwrap().clone();
+        let target_contr = self.graph.node_weight(target).unwrap().clone();
 
         // Create a new node with the two removed nodes as children
         let new_contr = Contraction::new(source_contr, target_contr);
         let new_node = self.graph.add_node(new_contr.into());
 
         // Link the new node to the previously linked nodes
-        for (node, w) in source_linked_nodes {
+        for (node, w) in backlinks {
+            self.graph.add_edge(node, new_node, w.max(ew));
+        }
+        for (node, w) in frontlinks {
             self.graph.add_edge(new_node, node, w.max(ew));
         }
-        for (node, w) in target_linked_nodes {
-            self.graph.add_edge(node, new_node, w.max(ew));
+
+        // Remove the source and target nodes
+        self.graph.remove_edge(edge);
+        self.graph.remove_node(source).unwrap();
+        self.graph.remove_node(target).unwrap();
+    }
+
+    pub fn contract(&mut self) {
+        let mut curr_rank = 1;
+        while self.graph.edge_count() > 0 {
+            let edges = self.find_disjoint_edges(curr_rank);
+            // If there are no edges to contract, move to the next rank
+            if edges.is_empty() {
+                curr_rank += 1;
+                continue;
+            }
+            println!("{}", self);
+            // Contract all the edges of the current rank
+            for edge in edges {
+                self.contract_edge(edge);
+            }
         }
     }
 }
