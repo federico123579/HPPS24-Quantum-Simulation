@@ -1,4 +1,4 @@
-use std::f64::consts::FRAC_PI_4;
+use std::{f64::consts::FRAC_PI_4, ops::Range};
 
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
 
@@ -82,43 +82,310 @@ impl<const N: usize> From<[Qubit; N]> for QRegister {
 // @@ Gates @@
 // @@@@@@@@@@@
 
-#[derive(Debug, Clone, Copy, Default)]
-pub enum GateKind {
-    #[default]
-    Identity,
-    /// Pauli-X Gate (X)
-    PauliX,
-    /// Pauli-Y Gate (Y)
-    PauliY,
-    /// Pauli-Z Gate (Z)
-    PauliZ,
-    /// Hadamard Gate (H)
-    Hadamard,
-    /// Phase Gate (S, P)
-    Phase,
-    /// Pi/8 Gate (T)
-    Pi8,
-    /// Controlled-NOT Gate (CNOT, CX, CNOT) - controlled is up
-    CNOTup,
-    /// Controlled-NOT Gate (CNOT, CX, CNOT) - controlled is down
-    CNOTdown,
-    /// Controlled-Z Gate (CZ)
-    ConZ,
-    /// Swap Gate (SWAP)
-    Swap,
-    /// Toffoli Gate (CCNOT, CCX, TOFF)
-    Toffoli,
+#[derive(Debug, Clone, Copy)]
+struct IdentityGate;
+#[derive(Debug, Clone, Copy)]
+struct PauliXGate;
+#[derive(Debug, Clone, Copy)]
+struct PauliYGate;
+#[derive(Debug, Clone, Copy)]
+struct PauliZGate;
+#[derive(Debug, Clone, Copy)]
+struct HadamardGate;
+#[derive(Debug, Clone, Copy)]
+struct PhaseGate;
+#[derive(Debug, Clone, Copy)]
+struct Pi8Gate;
+#[derive(Debug, Clone, Copy)]
+struct CNOTupGate;
+#[derive(Debug, Clone, Copy)]
+struct CNOTdownGate;
+#[derive(Debug, Clone, Copy)]
+struct ConZGate;
+#[derive(Debug, Clone, Copy)]
+struct SwapGate;
+#[derive(Debug, Clone, Copy)]
+struct ToffoliGate;
+
+pub trait QuantumGate {
+    fn matrix(&self) -> DMatrix<Complex<f64>>;
+    fn dim(&self) -> usize;
+    fn block(&self) -> Block {
+        Block {
+            matrix_repr: self.matrix(),
+            dim: self.dim(),
+        }
+    }
 }
 
-impl GateKind {
-    pub fn into_block(self) -> Block {
-        Block::from(self)
+impl<G: QuantumGate> From<G> for Block {
+    fn from(gate: G) -> Self {
+        gate.block()
+    }
+}
+
+impl QuantumGate for IdentityGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::identity(2, 2)
+    }
+}
+
+impl QuantumGate for PauliXGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(2, 2, &[0.0, 1.0, 1.0, 0.0]).map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for PauliYGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(2, 2, &[0.0, -1.0, 1.0, 0.0]).map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for PauliZGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, -1.0]).map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for HadamardGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(2, 2, &[1.0, 1.0, 1.0, -1.0])
+            .map(|x| Complex::new(x, 0.0) / 2.0_f64.sqrt())
+    }
+}
+
+impl QuantumGate for PhaseGate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(2, 2, &[1.0.into(), 0.0.into(), 0.0.into(), Complex::i()])
+    }
+}
+
+impl QuantumGate for Pi8Gate {
+    fn dim(&self) -> usize {
+        1
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            2,
+            2,
+            &[1.0.into(), 0.0.into(), 0.0.into(), Complex::cis(FRAC_PI_4)],
+        )
+    }
+}
+
+impl QuantumGate for CNOTupGate {
+    fn dim(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            4,
+            4,
+            &[
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+            ],
+        )
+        .map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for CNOTdownGate {
+    fn dim(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            4,
+            4,
+            &[
+                1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+            ],
+        )
+        .map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for ConZGate {
+    fn dim(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            4,
+            4,
+            &[
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
+            ],
+        )
+        .map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for SwapGate {
+    fn dim(&self) -> usize {
+        2
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            4,
+            4,
+            &[
+                1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+        )
+        .map(|x| Complex::new(x, 0.0))
+    }
+}
+
+impl QuantumGate for ToffoliGate {
+    fn dim(&self) -> usize {
+        3
+    }
+
+    fn matrix(&self) -> DMatrix<Complex<f64>> {
+        DMatrix::from_row_slice(
+            8,
+            8,
+            &[
+                1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+            ],
+        )
+        .map(|x| Complex::new(x, 0.0))
+    }
+}
+
+// @@@@@@@@@@@@@
+// @@ Circuit @@
+// @@@@@@@@@@@@@
+
+pub struct QuantumCircuit {
+    n_qubits: usize,
+    gates: Vec<(Box<dyn QuantumGate>, Range<usize>)>,
+}
+
+impl QuantumCircuit {
+    pub fn new(n_qubits: usize) -> Self {
+        QuantumCircuit {
+            n_qubits,
+            gates: Vec::new(),
+        }
+    }
+
+    pub fn g_id(&mut self, qix: usize) {
+        self.gates.push((Box::new(IdentityGate), qix..qix + 1));
+    }
+
+    pub fn g_x(&mut self, qix: usize) {
+        self.gates.push((Box::new(PauliXGate), qix..qix + 1));
+    }
+
+    pub fn g_y(&mut self, qix: usize) {
+        self.gates.push((Box::new(PauliYGate), qix..qix + 1));
+    }
+
+    pub fn g_z(&mut self, qix: usize) {
+        self.gates.push((Box::new(PauliZGate), qix..qix + 1));
+    }
+
+    pub fn g_h(&mut self, qix: usize) {
+        self.gates.push((Box::new(HadamardGate), qix..qix + 1));
+    }
+
+    pub fn g_s(&mut self, qix: usize) {
+        self.gates.push((Box::new(PhaseGate), qix..qix + 1));
+    }
+
+    pub fn g_t(&mut self, qix: usize) {
+        self.gates.push((Box::new(Pi8Gate), qix..qix + 1));
+    }
+
+    pub fn g_cxu(&mut self, qixr: Range<usize>) {
+        self.gates.push((Box::new(CNOTupGate), qixr));
+    }
+
+    pub fn g_cxd(&mut self, qixr: Range<usize>) {
+        self.gates.push((Box::new(CNOTdownGate), qixr));
+    }
+
+    pub fn g_cz(&mut self, qixr: Range<usize>) {
+        self.gates.push((Box::new(ConZGate), qixr));
+    }
+
+    pub fn g_swap(&mut self, qixr: Range<usize>) {
+        self.gates.push((Box::new(SwapGate), qixr));
+    }
+
+    pub fn g_toff(&mut self, qixr: Range<usize>) {
+        self.gates.push((Box::new(ToffoliGate), qixr));
+    }
+
+    pub fn eval(&self) -> Block {
+        let mut circuit =
+            (0..self.n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(IdentityGate));
+        for (gate, qrange) in self.gates.iter() {
+            let mut gate_block = gate.block();
+            // FIXME: this works only for 1-qubit gates
+            let mut new_block = Block::one();
+            for _ in 0..qrange.start {
+                new_block = new_block.tensor_product(IdentityGate);
+            }
+            new_block = new_block.tensor_product(gate_block);
+            for _ in qrange.end..self.n_qubits {
+                new_block = new_block.tensor_product(IdentityGate);
+            }
+            gate_block = new_block;
+            circuit = &circuit * &gate_block;
+        }
+        circuit
     }
 }
 
 // @@@@@@@@@@@@@@@@@
 // @@ COMPUTATION @@
 // @@@@@@@@@@@@@@@@@
+
+trait TensorProduct {
+    fn tensor_product(&self, rhs: impl Into<Block>) -> Block;
+}
+
+impl<G: QuantumGate> TensorProduct for G {
+    fn tensor_product(&self, rhs: impl Into<Block>) -> Block {
+        self.block().tensor_product(rhs)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
@@ -127,10 +394,20 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn tensor_product(&self, rhs: &Block) -> Block {
+    pub fn one() -> Self {
         Block {
-            matrix_repr: self.as_ref().kronecker(rhs.as_ref()),
-            dim: self.dim * rhs.dim,
+            matrix_repr: DMatrix::from_row_slice(1, 1, &[1.0]).map(|x| Complex::new(x, 0.0)),
+            dim: 1,
+        }
+    }
+}
+
+impl TensorProduct for Block {
+    fn tensor_product(&self, rhs: impl Into<Block>) -> Block {
+        let b = rhs.into();
+        Block {
+            matrix_repr: self.as_ref().kronecker(b.as_ref()),
+            dim: self.dim * b.dim,
         }
     }
 }
@@ -223,155 +500,6 @@ impl std::fmt::Display for Block {
     }
 }
 
-impl From<GateKind> for Block {
-    fn from(gate: GateKind) -> Self {
-        match gate {
-            GateKind::Identity => Block {
-                matrix_repr: DMatrix::identity(2, 2),
-                dim: 2,
-            },
-            GateKind::PauliX => Block {
-                matrix_repr: DMatrix::from_row_slice(2, 2, &[0.0, 1.0, 1.0, 0.0])
-                    .map(|x| Complex::new(x, 0.0)),
-                dim: 2,
-            },
-            GateKind::PauliY => {
-                let pauli_y = DMatrix::from_row_slice(
-                    2,
-                    2,
-                    &[0.0.into(), -Complex::i(), Complex::i(), 0.0.into()],
-                );
-                Block {
-                    matrix_repr: pauli_y,
-                    dim: 2,
-                }
-            }
-            GateKind::PauliZ => {
-                let pauli_z = DMatrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, -1.0])
-                    .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: pauli_z,
-                    dim: 2,
-                }
-            }
-            GateKind::Hadamard => Block {
-                matrix_repr: DMatrix::from_row_slice(
-                    2,
-                    2,
-                    &[
-                        1.0 / 2.0_f64.sqrt(),
-                        1.0 / 2.0_f64.sqrt(),
-                        1.0 / 2.0_f64.sqrt(),
-                        -1.0 / 2.0_f64.sqrt(),
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0)),
-                dim: 2,
-            },
-            GateKind::Phase => {
-                let phase = DMatrix::from_row_slice(
-                    2,
-                    2,
-                    &[1.0.into(), 0.0.into(), 0.0.into(), Complex::i()],
-                );
-                Block {
-                    matrix_repr: phase,
-                    dim: 2,
-                }
-            }
-            GateKind::Pi8 => {
-                let pi8 = DMatrix::from_row_slice(
-                    2,
-                    2,
-                    &[1.0.into(), 0.0.into(), 0.0.into(), Complex::cis(FRAC_PI_4)],
-                );
-                Block {
-                    matrix_repr: pi8,
-                    dim: 2,
-                }
-            }
-            GateKind::CNOTup => {
-                let cnot = DMatrix::from_row_slice(
-                    4,
-                    4,
-                    &[
-                        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
-                        0.0,
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: cnot,
-                    dim: 4,
-                }
-            }
-            GateKind::CNOTdown => {
-                let cnot = DMatrix::from_row_slice(
-                    4,
-                    4,
-                    &[
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
-                        0.0,
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: cnot,
-                    dim: 4,
-                }
-            }
-            GateKind::ConZ => {
-                let cz = DMatrix::from_row_slice(
-                    4,
-                    4,
-                    &[
-                        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                        -1.0,
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: cz,
-                    dim: 4,
-                }
-            }
-            GateKind::Swap => {
-                let swap = DMatrix::from_row_slice(
-                    4,
-                    4,
-                    &[
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                        1.0,
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: swap,
-                    dim: 4,
-                }
-            }
-            GateKind::Toffoli => {
-                let toffoli = DMatrix::from_row_slice(
-                    8,
-                    8,
-                    &[
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
-                        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                        0.0, 0.0, 1.0, 0.0,
-                    ],
-                )
-                .map(|x| Complex::new(x, 0.0));
-                Block {
-                    matrix_repr: toffoli,
-                    dim: 8,
-                }
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,17 +514,18 @@ mod tests {
             Qubit::zero(),
         ]);
 
-        let h_block = Block::from(GateKind::Hadamard);
+        let mut circ = QuantumCircuit::new(5);
+        circ.g_h(0);
+        circ.g_h(1);
+        circ.g_h(2);
+        circ.g_h(3);
+        circ.g_h(4);
 
-        let t1 = h_block
-            .tensor_product(&h_block)
-            .tensor_product(&h_block)
-            .tensor_product(&h_block)
-            .tensor_product(&h_block);
+        let t_eval = circ.eval();
+        // println!("Circuit eval: {}", t_eval);
 
-        let qstate = t1 * inr;
-        // println!("{}", qstate);
-
+        let qstate = t_eval * inr;
+        // println!("Qstate: {}", qstate);
         assert_eq!(qstate.qubits.len(), 32);
         for i in 0..32 {
             assert!((qstate.qubits[i] - Complex::new(1.0 / 32.0_f64.sqrt(), 0.0)).norm() < 1e-10);
@@ -405,17 +534,17 @@ mod tests {
 
     #[test]
     fn inverted_cnot() {
-        let h_block = Block::from(GateKind::Hadamard);
-        let cnot_block = Block::from(GateKind::CNOTup);
+        let mut circ = QuantumCircuit::new(2);
+        circ.g_h(0);
+        circ.g_h(1);
+        circ.g_cxu(0..2);
+        circ.g_h(0);
+        circ.g_h(1);
 
-        let t1 = h_block.tensor_product(&h_block);
-        let t2 = cnot_block;
-        let t3 = h_block.tensor_product(&h_block);
+        let t_eval = circ.eval();
+        println!("Circuit eval: {}", t_eval);
 
-        let t_eval = &t1 * &t2 * &t3;
-        let cnot_inverted = GateKind::CNOTdown.into_block();
-
-        // println!("{}", t_eval);
+        let cnot_inverted = CNOTdownGate.block();
         // println!("{}", cnot_inverted);
 
         for i in 0..4 {

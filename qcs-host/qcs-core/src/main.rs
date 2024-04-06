@@ -1,4 +1,4 @@
-use crate::model::{Block, GateKind, QRegister, Qubit};
+use crate::model::{QRegister, QuantumCircuit, Qubit};
 
 mod contractions;
 mod model;
@@ -6,18 +6,16 @@ mod tree;
 
 fn main() {
     let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
+    let mut circ = QuantumCircuit::new(2);
+    circ.g_x(1);
+    circ.g_h(0);
+    circ.g_h(1);
+    circ.g_cxd(0..2);
+    circ.g_h(0);
+    circ.g_h(1);
 
-    let i_block = Block::from(GateKind::Identity);
-    let x_block = Block::from(GateKind::PauliX);
-    let h_block = Block::from(GateKind::Hadamard);
-    let cnot_block = Block::from(GateKind::CNOTup);
+    let circ_eval = circ.eval();
+    let qstate = circ_eval * inr;
 
-    let t1 = i_block.tensor_product(&x_block);
-    let t2 = h_block.tensor_product(&h_block);
-    let t3 = cnot_block;
-    let t4 = h_block.tensor_product(&i_block);
-
-    let qstate = t1 * t2 * t3 * t4 * inr;
-
-    println!("{}", qstate);
+    println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
 }

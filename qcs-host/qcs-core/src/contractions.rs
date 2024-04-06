@@ -1,12 +1,12 @@
 use petgraph::{Directed, Graph};
 
 use crate::{
-    model::{Block, GateKind},
+    model::{Block, QuantumGate},
     tree::BTree,
 };
 
 struct ContractionGraph {
-    graph: Graph<GateKind, u8, Directed>,
+    graph: Graph<Box<dyn QuantumGate>, u8, Directed>,
 }
 
 struct ContractionTree {
