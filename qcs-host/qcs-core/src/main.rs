@@ -8,7 +8,6 @@ use crate::{
 mod contractions;
 mod model;
 mod scheduler;
-mod tree;
 
 fn main() {
     // let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
