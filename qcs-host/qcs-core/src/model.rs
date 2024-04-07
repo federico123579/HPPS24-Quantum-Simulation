@@ -112,9 +112,9 @@ impl std::fmt::Display for Gate {
             Gate::Hadamard(_) => write!(f, "H"),
             Gate::Phase(_) => write!(f, "S"),
             Gate::Pi8(_) => write!(f, "T"),
-            Gate::CNOTup(_) => write!(f, "CNOTU"),
-            Gate::CNOTdown(_) => write!(f, "CNOTD"),
-            Gate::ConZ(_) => write!(f, "CZ"),
+            Gate::CNOTup(_) => write!(f, "CNOT"),
+            Gate::CNOTdown(_) => write!(f, "CNOTinv"),
+            Gate::ConZ(_) => write!(f, "CZED"),
             Gate::Swap(_) => write!(f, "SWAP"),
             Gate::Toffoli(_) => write!(f, "TOFF"),
         }

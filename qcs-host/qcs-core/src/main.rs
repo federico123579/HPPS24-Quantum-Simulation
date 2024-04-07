@@ -1,13 +1,9 @@
 use either::Either;
 
-use crate::{
+use qcs_core::{
     model::{QRegister, QuantumCircuit, Qubit},
     scheduler::ContractionPlan,
 };
-
-mod contractions;
-mod model;
-mod scheduler;
 
 fn main() {
     // let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
