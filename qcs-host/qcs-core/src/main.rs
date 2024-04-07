@@ -1,7 +1,13 @@
-use crate::model::{QRegister, QuantumCircuit, Qubit};
+use either::Either;
+
+use crate::{
+    model::{QRegister, QuantumCircuit, Qubit},
+    scheduler::ContractionPlan,
+};
 
 mod contractions;
 mod model;
+mod scheduler;
 mod tree;
 
 fn main() {
@@ -29,6 +35,13 @@ fn main() {
     let mut contr_graph = circ.into_contraction_graph();
     contr_graph.contract();
     println!("{}", contr_graph);
+
+    for i in contr_graph.items() {
+        if let Either::Left(contr) = i.0 {
+            let plan = ContractionPlan::from(*contr);
+            println!("{}", plan);
+        }
+    }
 
     // let qstate = circ_eval * inr;
     // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));

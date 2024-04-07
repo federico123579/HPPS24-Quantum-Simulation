@@ -1,8 +1,10 @@
+use std::ops::Deref;
+
 use either::Either;
 use hashbrown::HashSet;
 use petgraph::{
-    graph::{EdgeIndex, EdgeReference, NodeIndex},
-    visit::{EdgeRef, IntoNodeIdentifiers, IntoNodeReferences},
+    graph::{EdgeIndex, NodeIndex},
+    visit::EdgeRef,
     Directed, Direction, Graph,
 };
 
@@ -103,12 +105,16 @@ impl TensorNetwork {
                 curr_rank += 1;
                 continue;
             }
-            println!("{}", self);
+            // println!("{}", self);
             // Contract all the edges of the current rank
             for edge in edges {
                 self.contract_edge(edge);
             }
         }
+    }
+
+    pub fn items(&self) -> Vec<ContractionItem> {
+        self.graph.node_weights().cloned().collect()
     }
 }
 
@@ -141,7 +147,7 @@ impl std::fmt::Display for TensorNetwork {
 }
 
 #[derive(Debug, Clone)]
-struct ContractionItem(Either<Box<Contraction>, Box<GateOnLanes>>);
+pub struct ContractionItem(pub Either<Box<Contraction>, Box<GateOnLanes>>);
 
 impl ContractionItem {
     fn rank(&self) -> u8 {
@@ -149,6 +155,14 @@ impl ContractionItem {
             Either::Left(c) => c.rank,
             Either::Right(g) => g.rank(),
         }
+    }
+}
+
+impl Deref for ContractionItem {
+    type Target = Either<Box<Contraction>, Box<GateOnLanes>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -174,10 +188,10 @@ impl std::fmt::Display for ContractionItem {
 }
 
 #[derive(Debug, Clone)]
-struct Contraction {
-    rank: u8,
-    left: ContractionItem,
-    right: ContractionItem,
+pub struct Contraction {
+    pub rank: u8,
+    pub left: ContractionItem,
+    pub right: ContractionItem,
 }
 
 impl Contraction {
