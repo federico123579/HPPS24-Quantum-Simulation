@@ -1,35 +1,101 @@
-use std::ops::Deref;
+use std::{ops::Deref, usize};
 
 use either::Either;
+use hashbrown::HashMap;
 
 use crate::{contractions::Contraction, model::GateOnLanes};
 
 pub struct ContractionPlan {
-    instructions: Vec<Instruction>,
+    instructions: HashMap<usize, Instruction>,
+    waiting_dep: HashMap<usize, Vec<usize>>,
+    dependants: HashMap<usize, Vec<usize>>,
+}
+
+impl ContractionPlan {
+    fn get_ready(&self) -> Vec<usize> {
+        self.waiting_dep
+            .iter()
+            .filter(|(_, deps)| deps.is_empty())
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    pub fn set_done(&mut self, ids: impl IntoIterator<Item = usize>) {
+        for id in ids {
+            assert!(self.waiting_dep.get(&id).unwrap().is_empty());
+            self.waiting_dep.remove(&id);
+            let deps = self.dependants.remove(&id).unwrap();
+            for dep in deps {
+                let waiting = self.waiting_dep.get_mut(&dep).unwrap();
+                waiting.retain(|&iid| iid != id);
+            }
+        }
+    }
+
+    pub fn fetch_ready(&mut self) -> Vec<Instruction> {
+        let ready = self.get_ready();
+        ready
+            .iter()
+            .map(|id| self.instructions.remove(id).unwrap())
+            .collect()
+    }
 }
 
 impl From<Contraction> for ContractionPlan {
     fn from(contraction: Contraction) -> Self {
         let (instruction, collaterals) = Instruction::from_contraction(0, contraction, vec![]);
-        let mut instructions = collaterals;
-        instructions.push(instruction);
-        Self { instructions }
+
+        let instructions: HashMap<_, _> = collaterals
+            .into_iter()
+            .chain(std::iter::once(instruction))
+            .map(|instr| (instr.id, instr))
+            .collect();
+        let waiting_dep: HashMap<usize, _> = instructions
+            .iter()
+            .map(|(id, instr)| (*id, instr.dependencies().to_vec()))
+            .collect();
+        let dependants = {
+            let mut dependants: HashMap<_, _> =
+                instructions.iter().map(|(id, _)| (*id, vec![])).collect();
+            for (id, deps) in &waiting_dep {
+                for dep in deps {
+                    dependants.get_mut(dep).unwrap().push(*id);
+                }
+            }
+            dependants
+        };
+
+        Self {
+            instructions,
+            waiting_dep,
+            dependants,
+        }
     }
 }
 
 impl std::fmt::Display for ContractionPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for instr in &self.instructions {
+        writeln!(f, "Instructions:")?;
+        for (_, instr) in &self.instructions {
             writeln!(f, "{}", instr)?;
+        }
+        writeln!(f, "Waiting dependencies:")?;
+        for (id, deps) in &self.waiting_dep {
+            writeln!(f, "{}: {:?}", id, deps)?;
+        }
+        writeln!(f, "Dependants:")?;
+        for (id, deps) in &self.dependants {
+            writeln!(f, "{}: {:?}", id, deps)?;
         }
         Ok(())
     }
 }
 
-struct Instruction {
-    id: usize,
+#[derive(Debug, Clone)]
+pub struct Instruction {
+    pub id: usize,
     dependencies: Vec<usize>,
-    rank: u8,
+    pub rank: u8,
     first: IntructionOperand,
     second: IntructionOperand,
 }
@@ -81,6 +147,10 @@ impl Instruction {
         };
 
         (instruction, collaterals)
+    }
+
+    fn dependencies(&self) -> &[usize] {
+        &self.dependencies
     }
 }
 

@@ -37,8 +37,20 @@ fn main() {
 
     for i in contracted_nodes {
         if let Either::Left(contr) = i.0 {
-            let plan = ContractionPlan::from(*contr);
+            let mut plan = ContractionPlan::from(*contr);
             println!("{}", plan);
+
+            let mut ready = plan.fetch_ready();
+            while !ready.is_empty() {
+                println!("Ready instructions:");
+                for instr in ready.iter() {
+                    println!("{}", instr);
+                }
+
+                plan.set_done(ready.iter().map(|i| i.id));
+                println!("............................................");
+                ready = plan.fetch_ready();
+            }
         }
     }
 
