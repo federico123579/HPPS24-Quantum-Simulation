@@ -1,11 +1,8 @@
-use std::{any::Any, borrow::BorrowMut, collections::VecDeque, ops::Deref};
+use std::ops::Deref;
 
 use either::Either;
 
-use crate::{
-    contractions::Contraction,
-    model::{Block, GateOnLanes},
-};
+use crate::{contractions::Contraction, model::GateOnLanes};
 
 pub struct ContractionPlan {
     instructions: Vec<Instruction>,

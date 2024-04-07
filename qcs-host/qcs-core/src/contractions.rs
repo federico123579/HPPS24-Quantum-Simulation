@@ -96,7 +96,7 @@ impl TensorNetwork {
         self.graph.remove_node(target).unwrap();
     }
 
-    pub fn contract(&mut self) {
+    pub fn contract(mut self) -> Vec<ContractionItem> {
         let mut curr_rank = 1;
         while self.graph.edge_count() > 0 {
             let edges = self.find_disjoint_edges(curr_rank);
@@ -111,10 +111,11 @@ impl TensorNetwork {
                 self.contract_edge(edge);
             }
         }
-    }
 
-    pub fn items(&self) -> Vec<ContractionItem> {
-        self.graph.node_weights().cloned().collect()
+        self.graph
+            .node_indices()
+            .map(|n| self.graph.remove_node(n).unwrap())
+            .collect()
     }
 }
 

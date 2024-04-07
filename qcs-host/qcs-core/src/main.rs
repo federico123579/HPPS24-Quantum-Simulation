@@ -32,11 +32,10 @@ fn main() {
     circ.g_z(2);
 
     // let circ_eval = circ.clone().eval();
-    let mut contr_graph = circ.into_contraction_graph();
-    contr_graph.contract();
-    println!("{}", contr_graph);
+    let contr_graph = circ.into_contraction_graph();
+    let contracted_nodes = contr_graph.contract();
 
-    for i in contr_graph.items() {
+    for i in contracted_nodes {
         if let Either::Left(contr) = i.0 {
             let plan = ContractionPlan::from(*contr);
             println!("{}", plan);
