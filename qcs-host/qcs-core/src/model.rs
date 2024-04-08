@@ -79,8 +79,8 @@ impl From<Qubit> for QRegister {
     }
 }
 
-impl<const N: usize> From<[Qubit; N]> for QRegister {
-    fn from(qubits: [Qubit; N]) -> Self {
+impl<B: IntoIterator<Item = Qubit>> From<B> for QRegister {
+    fn from(qubits: B) -> Self {
         QRegister {
             qubits: qubits
                 .into_iter()

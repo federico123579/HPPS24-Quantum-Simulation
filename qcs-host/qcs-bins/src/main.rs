@@ -2,7 +2,11 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use qcs_circuit_parser::parse_program;
-use qcs_core::{contractions::ContractionItem, scheduler::ContractionPlan};
+use qcs_core::{
+    contractions::ContractionItem,
+    model::{QRegister, Qubit},
+    scheduler::ContractionPlan,
+};
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {
@@ -14,9 +18,7 @@ fn main() {
     let input_txt = std::fs::read_to_string(args.input).unwrap();
     let circuit = parse_program(&input_txt).unwrap();
 
-    // let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
-    // let circ_eval = circ.clone().eval();
-    let contr_graph = circuit.into_contraction_graph();
+    let contr_graph = circuit.clone().into_contraction_graph();
     let mut contracted_nodes = contr_graph.contract().into_iter();
 
     while let Some(ContractionItem::Contraction(contr)) = contracted_nodes.next() {
@@ -36,6 +38,9 @@ fn main() {
         }
     }
 
-    // let qstate = circ_eval * inr;
+    let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
+    let circ_eval = circuit.clone().eval();
+    let qstate = circ_eval * inr;
     // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
+    println!("{}", qstate.distr());
 }
