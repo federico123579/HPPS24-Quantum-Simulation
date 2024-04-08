@@ -1,4 +1,4 @@
-mod gates;
+pub mod gates;
 
 use std::{f64::consts::FRAC_PI_4, ops::Range};
 
@@ -8,8 +8,8 @@ use nalgebra::{Complex, DMatrix, DVector, Vector2};
 use crate::{
     contractions::TensorNetwork,
     model::gates::{
-        CNOTdownGate, CNOTupGate, ConZGate, HadamardGate, IdentityGate, PauliXGate, PauliYGate,
-        PauliZGate, PhaseGate, Pi8Gate, SwapGate, ToffoliGate,
+        CNOTdown, CNOTup, ConZ, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Pi8, Swap,
+        Toffoli,
     },
 };
 
@@ -116,78 +116,77 @@ impl QuantumCircuit {
 
     pub fn g_id(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(IdentityGate, qix));
+        self.gates.push(GateOnLanes::at(Identity, qix));
     }
 
     pub fn g_x(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(PauliXGate, qix));
+        self.gates.push(GateOnLanes::at(PauliX, qix));
     }
 
     pub fn g_y(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(PauliYGate, qix));
+        self.gates.push(GateOnLanes::at(PauliY, qix));
     }
 
     pub fn g_z(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(PauliZGate, qix));
+        self.gates.push(GateOnLanes::at(PauliZ, qix));
     }
 
     pub fn g_h(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(HadamardGate, qix));
+        self.gates.push(GateOnLanes::at(Hadamard, qix));
     }
 
     pub fn g_s(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(PhaseGate, qix));
+        self.gates.push(GateOnLanes::at(Phase, qix));
     }
 
     pub fn g_t(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(GateOnLanes::at(Pi8Gate, qix));
+        self.gates.push(GateOnLanes::at(Pi8, qix));
     }
 
     pub fn g_cxu(&mut self, qixr: Range<usize>) {
         assert!(qixr.end <= self.n_qubits);
-        self.gates.push(GateOnLanes::new(CNOTupGate, qixr));
+        self.gates.push(GateOnLanes::new(CNOTup, qixr));
     }
 
     pub fn g_cxd(&mut self, qixr: Range<usize>) {
         assert!(qixr.end <= self.n_qubits);
-        self.gates.push(GateOnLanes::new(CNOTdownGate, qixr));
+        self.gates.push(GateOnLanes::new(CNOTdown, qixr));
     }
 
     pub fn g_cz(&mut self, qixr: Range<usize>) {
         assert!(qixr.end <= self.n_qubits);
-        self.gates.push(GateOnLanes::new(ConZGate, qixr));
+        self.gates.push(GateOnLanes::new(ConZ, qixr));
     }
 
     pub fn g_swap(&mut self, qixr: Range<usize>) {
         assert!(qixr.end <= self.n_qubits);
-        self.gates.push(GateOnLanes::new(SwapGate, qixr));
+        self.gates.push(GateOnLanes::new(Swap, qixr));
     }
 
     pub fn g_toff(&mut self, qixr: Range<usize>) {
         assert!(qixr.end <= self.n_qubits);
-        self.gates.push(GateOnLanes::new(ToffoliGate, qixr));
+        self.gates.push(GateOnLanes::new(Toffoli, qixr));
     }
 
     pub fn eval(self) -> Block {
         let Self { n_qubits, gates } = self;
-        let mut circuit =
-            (0..n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(IdentityGate));
+        let mut circuit = (0..n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(Identity));
         for (gate, qrange) in gates.into_iter().map(|g| g.deconstruct()) {
             let mut gate_block = gate.block();
             // FIXME: this works only for 1-qubit gates
             let mut new_block = Block::one();
             for _ in 0..qrange.start {
-                new_block = new_block.tensor_product(IdentityGate);
+                new_block = new_block.tensor_product(Identity);
             }
             new_block = new_block.tensor_product(gate_block);
             for _ in qrange.end..self.n_qubits {
-                new_block = new_block.tensor_product(IdentityGate);
+                new_block = new_block.tensor_product(Identity);
             }
             gate_block = new_block;
             circuit = &circuit * &gate_block;
@@ -298,6 +297,12 @@ impl TensorProduct for Block {
             matrix_repr: self.as_ref().kronecker(b.as_ref()),
             dim: self.dim * b.dim,
         }
+    }
+}
+
+impl<G: QuantumGate> From<G> for Block {
+    fn from(gate: G) -> Self {
+        gate.block()
     }
 }
 
@@ -433,7 +438,7 @@ mod tests {
         let t_eval = circ.eval();
         println!("Circuit eval: {}", t_eval);
 
-        let cnot_inverted = CNOTdownGate.block();
+        let cnot_inverted = CNOTdown.block();
         // println!("{}", cnot_inverted);
 
         for i in 0..4 {

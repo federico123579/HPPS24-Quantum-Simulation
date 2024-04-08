@@ -5,21 +5,33 @@ use nalgebra::{Complex, DMatrix};
 
 use super::Block;
 
-#[derive(Debug, Clone, Copy)]
+#[enum_dispatch]
+pub trait QuantumGate {
+    fn matrix(&self) -> DMatrix<Complex<f64>>;
+    fn rank(&self) -> u8;
+    fn block(&self) -> Block {
+        Block {
+            matrix_repr: self.matrix(),
+            dim: self.rank() as usize,
+        }
+    }
+}
+
 #[enum_dispatch(QuantumGate)]
+#[derive(Debug, Clone, Copy)]
 pub enum Gate {
-    Identity(IdentityGate),
-    PauliX(PauliXGate),
-    PauliY(PauliYGate),
-    PauliZ(PauliZGate),
-    Hadamard(HadamardGate),
-    Phase(PhaseGate),
-    Pi8(Pi8Gate),
-    CNOTup(CNOTupGate),
-    CNOTdown(CNOTdownGate),
-    ConZ(ConZGate),
-    Swap(SwapGate),
-    Toffoli(ToffoliGate),
+    Identity,
+    PauliX,
+    PauliY,
+    PauliZ,
+    Hadamard,
+    Phase,
+    Pi8,
+    CNOTup,
+    CNOTdown,
+    ConZ,
+    Swap,
+    Toffoli,
 }
 
 impl std::fmt::Display for Gate {
@@ -42,49 +54,9 @@ impl std::fmt::Display for Gate {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct IdentityGate;
-#[derive(Debug, Clone, Copy)]
-pub struct PauliXGate;
-#[derive(Debug, Clone, Copy)]
-pub struct PauliYGate;
-#[derive(Debug, Clone, Copy)]
-pub struct PauliZGate;
-#[derive(Debug, Clone, Copy)]
-pub struct HadamardGate;
-#[derive(Debug, Clone, Copy)]
-pub struct PhaseGate;
-#[derive(Debug, Clone, Copy)]
-pub struct Pi8Gate;
-#[derive(Debug, Clone, Copy)]
-pub struct CNOTupGate;
-#[derive(Debug, Clone, Copy)]
-pub struct CNOTdownGate;
-#[derive(Debug, Clone, Copy)]
-pub struct ConZGate;
-#[derive(Debug, Clone, Copy)]
-pub struct SwapGate;
-#[derive(Debug, Clone, Copy)]
-pub struct ToffoliGate;
+pub struct Identity;
 
-#[enum_dispatch]
-pub trait QuantumGate {
-    fn matrix(&self) -> DMatrix<Complex<f64>>;
-    fn rank(&self) -> u8;
-    fn block(&self) -> Block {
-        Block {
-            matrix_repr: self.matrix(),
-            dim: self.rank() as usize,
-        }
-    }
-}
-
-impl<G: QuantumGate> From<G> for Block {
-    fn from(gate: G) -> Self {
-        gate.block()
-    }
-}
-
-impl QuantumGate for IdentityGate {
+impl QuantumGate for Identity {
     fn rank(&self) -> u8 {
         1
     }
@@ -94,7 +66,10 @@ impl QuantumGate for IdentityGate {
     }
 }
 
-impl QuantumGate for PauliXGate {
+#[derive(Debug, Clone, Copy)]
+pub struct PauliX;
+
+impl QuantumGate for PauliX {
     fn rank(&self) -> u8 {
         1
     }
@@ -104,7 +79,10 @@ impl QuantumGate for PauliXGate {
     }
 }
 
-impl QuantumGate for PauliYGate {
+#[derive(Debug, Clone, Copy)]
+pub struct PauliY;
+
+impl QuantumGate for PauliY {
     fn rank(&self) -> u8 {
         1
     }
@@ -114,7 +92,10 @@ impl QuantumGate for PauliYGate {
     }
 }
 
-impl QuantumGate for PauliZGate {
+#[derive(Debug, Clone, Copy)]
+pub struct PauliZ;
+
+impl QuantumGate for PauliZ {
     fn rank(&self) -> u8 {
         1
     }
@@ -124,7 +105,10 @@ impl QuantumGate for PauliZGate {
     }
 }
 
-impl QuantumGate for HadamardGate {
+#[derive(Debug, Clone, Copy)]
+pub struct Hadamard;
+
+impl QuantumGate for Hadamard {
     fn rank(&self) -> u8 {
         1
     }
@@ -135,7 +119,10 @@ impl QuantumGate for HadamardGate {
     }
 }
 
-impl QuantumGate for PhaseGate {
+#[derive(Debug, Clone, Copy)]
+pub struct Phase;
+
+impl QuantumGate for Phase {
     fn rank(&self) -> u8 {
         1
     }
@@ -145,7 +132,10 @@ impl QuantumGate for PhaseGate {
     }
 }
 
-impl QuantumGate for Pi8Gate {
+#[derive(Debug, Clone, Copy)]
+pub struct Pi8;
+
+impl QuantumGate for Pi8 {
     fn rank(&self) -> u8 {
         1
     }
@@ -159,7 +149,10 @@ impl QuantumGate for Pi8Gate {
     }
 }
 
-impl QuantumGate for CNOTupGate {
+#[derive(Debug, Clone, Copy)]
+pub struct CNOTup;
+
+impl QuantumGate for CNOTup {
     fn rank(&self) -> u8 {
         2
     }
@@ -176,7 +169,10 @@ impl QuantumGate for CNOTupGate {
     }
 }
 
-impl QuantumGate for CNOTdownGate {
+#[derive(Debug, Clone, Copy)]
+pub struct CNOTdown;
+
+impl QuantumGate for CNOTdown {
     fn rank(&self) -> u8 {
         2
     }
@@ -193,7 +189,10 @@ impl QuantumGate for CNOTdownGate {
     }
 }
 
-impl QuantumGate for ConZGate {
+#[derive(Debug, Clone, Copy)]
+pub struct ConZ;
+
+impl QuantumGate for ConZ {
     fn rank(&self) -> u8 {
         2
     }
@@ -210,7 +209,10 @@ impl QuantumGate for ConZGate {
     }
 }
 
-impl QuantumGate for SwapGate {
+#[derive(Debug, Clone, Copy)]
+pub struct Swap;
+
+impl QuantumGate for Swap {
     fn rank(&self) -> u8 {
         2
     }
@@ -227,7 +229,10 @@ impl QuantumGate for SwapGate {
     }
 }
 
-impl QuantumGate for ToffoliGate {
+#[derive(Debug, Clone, Copy)]
+pub struct Toffoli;
+
+impl QuantumGate for Toffoli {
     fn rank(&self) -> u8 {
         3
     }

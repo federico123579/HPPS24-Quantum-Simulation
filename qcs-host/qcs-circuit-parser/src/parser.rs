@@ -2,10 +2,7 @@ use std::ops::{Deref, DerefMut, Range};
 
 use logos::{Lexer, Logos};
 use nom::InputLength;
-use qcs_core::model::{
-    CNOTupGate, ConZGate, Gate, GateOnLanes, HadamardGate, PauliXGate, PauliYGate, PauliZGate,
-    PhaseGate, Pi8Gate, SwapGate, ToffoliGate,
-};
+use qcs_core::model::{gates::*, GateOnLanes};
 
 use crate::{
     error::{Error, ErrorKind},
@@ -67,16 +64,16 @@ pub fn parse_gate(input: Parser<'_>) -> IResult<GateOnLanes> {
 fn parse_gate_kind(input: Parser<'_>) -> IResult<Gate> {
     let (input, token) = expect_next(input)?;
     let kind = match token {
-        Token::GateX => Gate::PauliX(PauliXGate),
-        Token::GateY => Gate::PauliY(PauliYGate),
-        Token::GateZ => Gate::PauliZ(PauliZGate),
-        Token::GateH => Gate::Hadamard(HadamardGate),
-        Token::GateS => Gate::Phase(PhaseGate),
-        Token::GateT => Gate::Pi8(Pi8Gate),
-        Token::GateCNOT => Gate::CNOTup(CNOTupGate),
-        Token::GateCZED => Gate::ConZ(ConZGate),
-        Token::GateSWAP => Gate::Swap(SwapGate),
-        Token::GateTOFF => Gate::Toffoli(ToffoliGate),
+        Token::GateX => Gate::PauliX(PauliX),
+        Token::GateY => Gate::PauliY(PauliY),
+        Token::GateZ => Gate::PauliZ(PauliZ),
+        Token::GateH => Gate::Hadamard(Hadamard),
+        Token::GateS => Gate::Phase(Phase),
+        Token::GateT => Gate::Pi8(Pi8),
+        Token::GateCNOT => Gate::CNOTup(CNOTup),
+        Token::GateCZED => Gate::ConZ(ConZ),
+        Token::GateSWAP => Gate::Swap(Swap),
+        Token::GateTOFF => Gate::Toffoli(Toffoli),
         _ => return Err(unexpected(input)),
     };
     Ok((input, kind))
