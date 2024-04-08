@@ -4,7 +4,8 @@ use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::ContractionItem,
-    model::{QRegister, Qubit},
+    executor::CpuExecutor,
+    model::{Block, QRegister, Qubit, SpannedBlock, TensorProduct},
     scheduler::ContractionPlan,
 };
 
@@ -21,6 +22,8 @@ fn main() {
     let contr_graph = circuit.clone().into_contraction_graph();
     let mut contracted_nodes = contr_graph.contract().into_iter();
 
+    let mut instructions = Vec::new();
+
     while let Some(ContractionItem::Contraction(contr)) = contracted_nodes.next() {
         let mut plan = ContractionPlan::from(*contr);
         println!("{}", plan);
@@ -29,10 +32,11 @@ fn main() {
         while !ready.is_empty() {
             println!("Ready instructions:");
             for instr in ready.iter() {
-                println!("{}", instr);
+                println!("{}", &instr);
             }
 
             plan.set_done(ready.iter().map(|i| i.id));
+            instructions.extend(ready);
             println!("............................................");
             ready = plan.fetch_ready();
         }
@@ -40,7 +44,20 @@ fn main() {
 
     let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
     let circ_eval = circuit.clone().eval();
-    let qstate = circ_eval * inr;
+    let qstate = circ_eval * inr.clone();
     // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
     println!("{}", qstate.distr());
+
+    let mut exec = CpuExecutor::new();
+    let blocks = exec.execute(instructions);
+
+    let eval = blocks.into_iter().fold(None, |acc, block| match acc {
+        None => Some(block),
+        Some(acc) => Some(acc.tensor_product(block)),
+    });
+
+    if let Some(eval) = eval {
+        let qstate = eval.into_block() * inr;
+        println!("{}", qstate.distr());
+    }
 }

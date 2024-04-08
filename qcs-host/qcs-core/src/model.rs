@@ -1,6 +1,6 @@
 pub mod gates;
 
-use std::ops::Range;
+use std::ops::{Mul, Range};
 
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
 
@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-use self::gates::{CircuitGate, QuantumGate};
+use self::gates::{CircuitGate, GateSpan, QuantumGate};
 
 // @@@@@@@@@@@@
 // @@ Qubits @@
@@ -202,13 +202,99 @@ impl QuantumCircuit {
 // @@ COMPUTATION @@
 // @@@@@@@@@@@@@@@@@
 
-trait TensorProduct {
-    fn tensor_product(&self, rhs: impl Into<Block>) -> Block;
+pub trait TensorProduct<Rhs = Self> {
+    type Output;
+
+    fn tensor_product(&self, rhs: impl Into<Rhs>) -> Self::Output;
 }
 
-impl<G: QuantumGate> TensorProduct for G {
-    fn tensor_product(&self, rhs: impl Into<Block>) -> Block {
+impl<G: QuantumGate> TensorProduct<Block> for G {
+    type Output = Block;
+
+    fn tensor_product(&self, rhs: impl Into<Block>) -> Self::Output {
         self.block().tensor_product(rhs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpannedBlock {
+    block: Block,
+    span: GateSpan,
+}
+
+impl SpannedBlock {
+    fn new(block: Block, span: GateSpan) -> Self {
+        Self { block, span }
+    }
+
+    pub fn merged_span(&self, rhs: &SpannedBlock) -> GateSpan {
+        self.span.merge(&rhs.span)
+    }
+
+    pub fn adapt_to_span(mut self, span: GateSpan) -> Self {
+        let mut new_block = Block::one();
+        for _ in span.start()..self.span.start() {
+            new_block = new_block.tensor_product(Identity);
+        }
+        new_block = new_block.tensor_product(self.block);
+        for _ in self.span.end()..span.end() {
+            new_block = new_block.tensor_product(Identity);
+        }
+        self.block = new_block;
+        self.span = span;
+        self
+    }
+
+    pub fn into_block(self) -> Block {
+        self.block
+    }
+}
+
+impl std::fmt::Display for SpannedBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SpannedBlock{}:\n{}", self.span, self.block)
+    }
+}
+
+impl From<CircuitGate> for SpannedBlock {
+    fn from(gate: CircuitGate) -> Self {
+        Self::new(gate.kind.block(), gate.span)
+    }
+}
+
+impl TensorProduct for SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn tensor_product(&self, rhs: impl Into<SpannedBlock>) -> Self::Output {
+        let rhs = rhs.into();
+        SpannedBlock {
+            block: &self.block * &rhs.block,
+            span: self.span.merge(&rhs.span),
+        }
+    }
+}
+
+impl Mul<&SpannedBlock> for &SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn mul(self, rhs: &SpannedBlock) -> Self::Output {
+        assert_eq!(self.span, rhs.span, "Incompatible spans");
+        SpannedBlock {
+            block: &self.block * &rhs.block,
+            span: self.span.merge(&rhs.span),
+        }
+    }
+}
+
+impl Mul<SpannedBlock> for SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn mul(self, rhs: SpannedBlock) -> Self::Output {
+        assert_eq!(self.span, rhs.span, "Incompatible spans");
+        SpannedBlock {
+            block: &self.block * &rhs.block,
+            span: self.span.merge(&rhs.span),
+        }
     }
 }
 
@@ -228,7 +314,9 @@ impl Block {
 }
 
 impl TensorProduct for Block {
-    fn tensor_product(&self, rhs: impl Into<Block>) -> Block {
+    type Output = Block;
+
+    fn tensor_product(&self, rhs: impl Into<Block>) -> Self::Output {
         let b = rhs.into();
         Block {
             matrix_repr: self.as_ref().kronecker(b.as_ref()),
@@ -249,7 +337,7 @@ impl AsRef<DMatrix<Complex<f64>>> for Block {
     }
 }
 
-impl std::ops::Mul<&Block> for &Block {
+impl Mul<&Block> for &Block {
     type Output = Block;
 
     fn mul(self, rhs: &Block) -> Self::Output {
@@ -260,7 +348,7 @@ impl std::ops::Mul<&Block> for &Block {
     }
 }
 
-impl std::ops::Mul<Block> for &Block {
+impl Mul<Block> for &Block {
     type Output = Block;
 
     fn mul(self, rhs: Block) -> Self::Output {
@@ -271,7 +359,7 @@ impl std::ops::Mul<Block> for &Block {
     }
 }
 
-impl std::ops::Mul<Block> for Block {
+impl Mul<Block> for Block {
     type Output = Block;
 
     fn mul(self, rhs: Block) -> Self::Output {
@@ -282,7 +370,7 @@ impl std::ops::Mul<Block> for Block {
     }
 }
 
-impl std::ops::Mul<&Block> for Block {
+impl Mul<&Block> for Block {
     type Output = Block;
 
     fn mul(self, rhs: &Block) -> Self::Output {
@@ -293,7 +381,7 @@ impl std::ops::Mul<&Block> for Block {
     }
 }
 
-impl<Q: Into<QRegister>> std::ops::Mul<Q> for Block {
+impl<Q: Into<QRegister>> Mul<Q> for Block {
     type Output = QRegister;
 
     fn mul(self, rhs: Q) -> Self::Output {
