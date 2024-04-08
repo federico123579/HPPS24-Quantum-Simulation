@@ -1,3 +1,3 @@
 [workspace]
-members = [ "qcs-circuit-parser","qcs-core"]
+members = [ "qcs-bins", "qcs-circuit-parser","qcs-core"]
 resolver = "2"

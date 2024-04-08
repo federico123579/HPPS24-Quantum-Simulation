@@ -3,55 +3,38 @@ use std::ops::Deref;
 use either::Either;
 use hashbrown::HashSet;
 use petgraph::{
-    graph::{EdgeIndex, NodeIndex},
-    visit::EdgeRef,
-    Directed, Direction, Graph,
+    graph::EdgeIndex,
+    stable_graph::{EdgeReference, StableGraph},
+    visit::{EdgeRef, IntoEdgeReferences},
+    Directed, Direction,
 };
 
 use crate::model::{GateOnLanes, QuantumCircuit};
 
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
-    graph: Graph<ContractionItem, u8, Directed>,
+    graph: StableGraph<ContractionItem, u8, Directed>,
 }
 
 impl TensorNetwork {
-    #[inline]
-    fn edge_w(&self, edge: EdgeIndex) -> u8 {
-        *self.graph.edge_weight(edge).unwrap()
-    }
-
-    #[inline]
-    fn edge_source(&self, edge: EdgeIndex) -> NodeIndex {
-        self.graph.edge_endpoints(edge).unwrap().0
-    }
-
-    #[inline]
-    fn edge_target(&self, edge: EdgeIndex) -> NodeIndex {
-        self.graph.edge_endpoints(edge).unwrap().1
-    }
-
-    fn find_edges(&self, rank: u8) -> Vec<EdgeIndex> {
+    fn find_edges(&self, rank: u8) -> Vec<EdgeReference<u8>> {
         self.graph
-            .edge_indices()
-            .filter(|e| self.edge_w(*e) == rank)
+            .edge_references()
+            .filter(|e| *e.weight() == rank)
             .collect::<Vec<_>>()
     }
 
-    fn find_disjoint_edges(&self, rank: u8) -> Vec<EdgeIndex> {
+    fn find_disjoint_edges(&self, rank: u8) -> Vec<EdgeReference<u8>> {
         let mut visited = HashSet::new();
         self.find_edges(rank)
             .into_iter()
-            .filter(|e| {
-                visited.insert(self.edge_source(*e)) && visited.insert(self.edge_target(*e))
-            })
+            .filter(|e| visited.insert(e.source()) && visited.insert(e.target()))
             .collect()
     }
 
     fn contract_edge(&mut self, edge: EdgeIndex) {
-        let ew = self.edge_w(edge);
-        let source = self.edge_source(edge);
-        let target = self.edge_target(edge);
+        let ew = *self.graph.edge_weight(edge).unwrap();
+        let (source, target) = self.graph.edge_endpoints(edge).unwrap();
 
         // Get the nodes linked to the source and target nodes
         let backlinks = self
@@ -99,30 +82,31 @@ impl TensorNetwork {
     pub fn contract(mut self) -> Vec<ContractionItem> {
         let mut curr_rank = 1;
         while self.graph.edge_count() > 0 {
-            let edges = self.find_disjoint_edges(curr_rank);
+            let edges = self
+                .find_disjoint_edges(curr_rank)
+                .into_iter()
+                .map(|e| e.id())
+                .collect::<Vec<_>>();
             // If there are no edges to contract, move to the next rank
             if edges.is_empty() {
                 curr_rank += 1;
                 continue;
             }
-            // println!("{}", self);
+            println!("{}", self);
             // Contract all the edges of the current rank
             for edge in edges {
                 self.contract_edge(edge);
             }
         }
 
-        self.graph
-            .node_indices()
-            .map(|n| self.graph.remove_node(n).unwrap())
-            .collect()
+        self.graph.node_weights().cloned().collect()
     }
 }
 
 impl From<QuantumCircuit> for TensorNetwork {
     fn from(value: QuantumCircuit) -> Self {
         let QuantumCircuit { n_qubits, gates } = value;
-        let mut graph = Graph::new();
+        let mut graph = StableGraph::new();
         let mut nodes = vec![None; n_qubits];
 
         for gl in gates {

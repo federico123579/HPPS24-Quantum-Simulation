@@ -1,33 +1,22 @@
-use either::Either;
+use std::path::PathBuf;
 
-use qcs_core::{
-    model::{QRegister, QuantumCircuit, Qubit},
-    scheduler::ContractionPlan,
-};
+use clap::Parser;
+use qcs_circuit_parser::parse_program;
+use qcs_core::{scheduler::ContractionPlan, Either};
+
+#[derive(Debug, Clone, Parser)]
+struct Cli {
+    input: PathBuf,
+}
 
 fn main() {
+    let args = Cli::parse();
+    let input_txt = std::fs::read_to_string(args.input).unwrap();
+    let circuit = parse_program(&input_txt).unwrap();
+
     // let inr = QRegister::from([Qubit::one(), Qubit::new(0.0.into(), (-1.0).into())]);
-    // let mut circ = QuantumCircuit::new(2);
-    // circ.g_x(1);
-    // circ.g_h(0);
-    // circ.g_h(1);
-    // circ.g_cxd(0..2);
-    // circ.g_h(0);
-    // circ.g_h(1);
-
-    let mut circ = QuantumCircuit::new(3);
-    circ.g_x(0);
-    circ.g_h(0);
-    circ.g_h(1);
-    circ.g_x(2);
-    circ.g_cxu(0..2);
-    circ.g_z(0);
-    circ.g_swap(1..3);
-    circ.g_h(1);
-    circ.g_z(2);
-
     // let circ_eval = circ.clone().eval();
-    let contr_graph = circ.into_contraction_graph();
+    let contr_graph = circuit.into_contraction_graph();
     let contracted_nodes = contr_graph.contract();
 
     for i in contracted_nodes {

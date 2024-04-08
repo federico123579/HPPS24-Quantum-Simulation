@@ -377,10 +377,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "qcs-circuit-parser"
+name = "qcs-bins"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "qcs-circuit-parser",
+ "qcs-core",
+]
+
+[[package]]
+name = "qcs-circuit-parser"
+version = "0.1.0"
+dependencies = [
  "logos",
  "nom",
  "qcs-core",

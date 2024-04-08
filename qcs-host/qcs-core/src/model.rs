@@ -345,6 +345,11 @@ impl QuantumCircuit {
         }
     }
 
+    pub fn push_gate(&mut self, gate: GateOnLanes) {
+        assert!(gate.lanes.end <= self.n_qubits);
+        self.gates.push(gate);
+    }
+
     pub fn g_id(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(GateOnLanes::at(IdentityGate, qix));

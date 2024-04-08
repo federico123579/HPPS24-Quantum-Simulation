@@ -1,11 +1,11 @@
 [package]
-name = "qcs-circuit-parser"
+name = "qcs-bins"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+qcs-circuit-parser = { path = "../qcs-circuit-parser" }
 qcs-core = { path = "../qcs-core" }
-logos = "0.14.0"
-nom = "7.1.3"
+clap = { version = "4.5.4", features = ["derive"] }

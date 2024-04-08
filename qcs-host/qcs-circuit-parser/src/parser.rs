@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut, Range};
 
 use logos::{Lexer, Logos};
-use nom::{multi::many0, Finish, InputLength};
+use nom::InputLength;
 use qcs_core::model::{
     CNOTupGate, ConZGate, Gate, GateOnLanes, HadamardGate, PauliXGate, PauliYGate, PauliZGate,
     PhaseGate, Pi8Gate, SwapGate, ToffoliGate,
@@ -43,12 +43,7 @@ impl InputLength for Parser<'_> {
 
 pub type IResult<'s, T> = nom::IResult<Parser<'s>, T, Error<'s>>;
 
-pub fn parse_program(input: Parser<'_>) -> Result<Vec<GateOnLanes>, Error> {
-    let (_, gates) = many0(parse_gate)(input).finish()?;
-    Ok(gates)
-}
-
-fn parse_gate(input: Parser<'_>) -> IResult<GateOnLanes> {
+pub fn parse_gate(input: Parser<'_>) -> IResult<GateOnLanes> {
     let (input, gate) = parse_gate_kind(input)?;
     let (input, lanes) = match gate {
         Gate::PauliX(_)
@@ -58,7 +53,7 @@ fn parse_gate(input: Parser<'_>) -> IResult<GateOnLanes> {
         | Gate::Phase(_)
         | Gate::Pi8(_) => {
             let (input, lane) = parse_lane(input)?;
-            (input, lane..lane)
+            (input, lane..lane + 1)
         }
         Gate::CNOTup(_) | Gate::ConZ(_) | Gate::Swap(_) | Gate::Toffoli(_) => {
             let (input, range) = parse_lanes_range(input)?;
