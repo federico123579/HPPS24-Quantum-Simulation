@@ -1,9 +1,11 @@
-use std::{ops::Deref, usize};
+use std::usize;
 
-use either::Either;
 use hashbrown::HashMap;
 
-use crate::{contractions::Contraction, model::GateOnLanes};
+use crate::{
+    contractions::{Contraction, ContractionItem},
+    model::gates::CircuitGate,
+};
 
 pub struct ContractionPlan {
     instructions: HashMap<usize, Instruction>,
@@ -94,10 +96,10 @@ impl std::fmt::Display for ContractionPlan {
 #[derive(Debug, Clone)]
 pub struct Instruction {
     pub id: usize,
-    dependencies: Vec<usize>,
+    pub dependencies: Vec<usize>,
     pub rank: u8,
-    first: IntructionOperand,
-    second: IntructionOperand,
+    pub first: InstructionOperand,
+    pub second: InstructionOperand,
 }
 
 impl Instruction {
@@ -115,29 +117,29 @@ impl Instruction {
             left, right, rank, ..
         } = contr;
 
-        let first = if left.is_left() {
-            let (left_instr, col) =
-                Self::from_contraction(available_id, *left.0.unwrap_left(), collaterals);
-            collaterals = col;
-            let instr_id = left_instr.id;
-            dependencies.push(instr_id);
-            collaterals.push(left_instr);
-            available_id += collaterals.len() + 1;
-            IntructionOperand::from(instr_id)
-        } else {
-            IntructionOperand::from(*left.0.unwrap_right())
+        let first = match left {
+            ContractionItem::Contraction(contr) => {
+                let (instr, col) = Self::from_contraction(available_id, *contr, collaterals);
+                collaterals = col;
+                let instr_id = instr.id;
+                dependencies.push(instr_id);
+                collaterals.push(instr);
+                available_id += collaterals.len() + 1;
+                InstructionOperand::from(instr_id)
+            }
+            ContractionItem::Gate(gate) => InstructionOperand::Gate(*gate),
         };
 
-        let second = if right.is_left() {
-            let (right_instr, col) =
-                Self::from_contraction(available_id, *right.0.unwrap_left(), collaterals);
-            collaterals = col;
-            let instr_id = right_instr.id;
-            dependencies.push(instr_id);
-            collaterals.push(right_instr);
-            IntructionOperand::from(instr_id)
-        } else {
-            IntructionOperand::from(*right.0.unwrap_right())
+        let second = match right {
+            ContractionItem::Contraction(contr) => {
+                let (instr, col) = Self::from_contraction(available_id, *contr, collaterals);
+                collaterals = col;
+                let instr_id = instr.id;
+                dependencies.push(instr_id);
+                collaterals.push(instr);
+                InstructionOperand::from(instr_id)
+            }
+            ContractionItem::Gate(gate) => InstructionOperand::Gate(*gate),
         };
 
         let instruction = Self {
@@ -167,33 +169,28 @@ impl std::fmt::Display for Instruction {
 }
 
 #[derive(Debug, Clone)]
-struct IntructionOperand(Either<GateOnLanes, usize>);
+pub enum InstructionOperand {
+    Gate(CircuitGate),
+    Address(usize),
+}
 
-impl From<GateOnLanes> for IntructionOperand {
-    fn from(gate: GateOnLanes) -> Self {
-        Self(Either::Left(gate))
+impl From<CircuitGate> for InstructionOperand {
+    fn from(gate: CircuitGate) -> Self {
+        Self::Gate(gate)
     }
 }
 
-impl From<usize> for IntructionOperand {
+impl From<usize> for InstructionOperand {
     fn from(id: usize) -> Self {
-        Self(Either::Right(id))
+        Self::Address(id)
     }
 }
 
-impl Deref for IntructionOperand {
-    type Target = Either<GateOnLanes, usize>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for IntructionOperand {
+impl std::fmt::Display for InstructionOperand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.0 {
-            Either::Left(gate) => write!(f, "g:{}", gate),
-            Either::Right(id) => write!(f, "id:{}", id),
+        match &self {
+            Self::Gate(gate) => write!(f, "g:{}", gate),
+            Self::Address(id) => write!(f, "id:{}", id),
         }
     }
 }

@@ -1,9 +1,50 @@
-use std::f64::consts::FRAC_PI_4;
+use std::{f64::consts::FRAC_PI_4, ops::Range};
 
 use enum_dispatch::enum_dispatch;
 use nalgebra::{Complex, DMatrix};
 
 use super::Block;
+
+#[derive(Debug, Clone)]
+pub struct CircuitGate {
+    pub kind: GateKind,
+    pub span: GateSpan,
+}
+
+impl CircuitGate {
+    pub fn new(gate: impl Into<GateKind>, span: impl Into<GateSpan>) -> Self {
+        CircuitGate {
+            kind: gate.into(),
+            span: span.into(),
+        }
+    }
+
+    pub fn at(gate: impl Into<GateKind>, lane: usize) -> Self {
+        Self::new(gate, lane..lane + 1)
+    }
+
+    pub fn rank(&self) -> u8 {
+        self.kind.rank()
+    }
+
+    pub fn block(&self) -> Block {
+        self.kind.block()
+    }
+
+    pub fn span(&self) -> &GateSpan {
+        &self.span
+    }
+
+    pub fn deconstruct(self) -> (GateKind, GateSpan) {
+        (self.kind, self.span)
+    }
+}
+
+impl std::fmt::Display for CircuitGate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.kind, self.span)
+    }
+}
 
 #[enum_dispatch]
 pub trait QuantumGate {
@@ -19,7 +60,7 @@ pub trait QuantumGate {
 
 #[enum_dispatch(QuantumGate)]
 #[derive(Debug, Clone, Copy)]
-pub enum Gate {
+pub enum GateKind {
     Identity,
     PauliX,
     PauliY,
@@ -34,21 +75,40 @@ pub enum Gate {
     Toffoli,
 }
 
-impl std::fmt::Display for Gate {
+impl GateKind {
+    pub fn is_rank_one(&self) -> bool {
+        match self {
+            GateKind::Identity(_)
+            | GateKind::PauliX(_)
+            | GateKind::PauliY(_)
+            | GateKind::PauliZ(_)
+            | GateKind::Hadamard(_)
+            | GateKind::Phase(_)
+            | GateKind::Pi8(_) => true,
+            GateKind::CNOTup(_)
+            | GateKind::CNOTdown(_)
+            | GateKind::ConZ(_)
+            | GateKind::Swap(_)
+            | GateKind::Toffoli(_) => false,
+        }
+    }
+}
+
+impl std::fmt::Display for GateKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Gate::Identity(_) => write!(f, "I"),
-            Gate::PauliX(_) => write!(f, "X"),
-            Gate::PauliY(_) => write!(f, "Y"),
-            Gate::PauliZ(_) => write!(f, "Z"),
-            Gate::Hadamard(_) => write!(f, "H"),
-            Gate::Phase(_) => write!(f, "S"),
-            Gate::Pi8(_) => write!(f, "T"),
-            Gate::CNOTup(_) => write!(f, "CNOT"),
-            Gate::CNOTdown(_) => write!(f, "CNOTinv"),
-            Gate::ConZ(_) => write!(f, "CZED"),
-            Gate::Swap(_) => write!(f, "SWAP"),
-            Gate::Toffoli(_) => write!(f, "TOFF"),
+            GateKind::Identity(_) => write!(f, "I"),
+            GateKind::PauliX(_) => write!(f, "X"),
+            GateKind::PauliY(_) => write!(f, "Y"),
+            GateKind::PauliZ(_) => write!(f, "Z"),
+            GateKind::Hadamard(_) => write!(f, "H"),
+            GateKind::Phase(_) => write!(f, "S"),
+            GateKind::Pi8(_) => write!(f, "T"),
+            GateKind::CNOTup(_) => write!(f, "CNOT"),
+            GateKind::CNOTdown(_) => write!(f, "CNOTinv"),
+            GateKind::ConZ(_) => write!(f, "CZED"),
+            GateKind::Swap(_) => write!(f, "SWAP"),
+            GateKind::Toffoli(_) => write!(f, "TOFF"),
         }
     }
 }
@@ -249,5 +309,68 @@ impl QuantumGate for Toffoli {
             ],
         )
         .map(|x| Complex::new(x, 0.0))
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GateSpan(Range<usize>);
+
+impl GateSpan {
+    #[inline]
+    pub fn single(lane: usize) -> Self {
+        GateSpan(lane..lane + 1)
+    }
+
+    #[inline]
+    pub fn range(range: Range<usize>) -> Self {
+        GateSpan(range)
+    }
+
+    #[inline]
+    pub fn start(&self) -> usize {
+        self.0.start
+    }
+
+    #[inline]
+    pub fn end(&self) -> usize {
+        self.0.end
+    }
+
+    #[inline]
+    pub fn span_len(&self) -> usize {
+        self.end() - self.start()
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        let start = self.start().min(other.start());
+        let end = self.end().max(other.end());
+        GateSpan(start..end)
+    }
+
+    pub fn into_range(self) -> Range<usize> {
+        self.0
+    }
+}
+
+impl std::fmt::Display for GateSpan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}:{}]", self.start(), self.end() - 1)
+    }
+}
+
+impl From<Range<usize>> for GateSpan {
+    fn from(range: Range<usize>) -> Self {
+        GateSpan(range)
+    }
+}
+
+impl From<usize> for GateSpan {
+    fn from(lane: usize) -> Self {
+        GateSpan(lane..lane + 1)
+    }
+}
+
+impl From<GateSpan> for Range<usize> {
+    fn from(span: GateSpan) -> Self {
+        span.0
     }
 }

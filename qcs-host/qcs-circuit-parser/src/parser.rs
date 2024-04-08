@@ -1,8 +1,8 @@
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{Deref, DerefMut};
 
 use logos::{Lexer, Logos};
 use nom::InputLength;
-use qcs_core::model::{gates::*, GateOnLanes};
+use qcs_core::model::gates::*;
 
 use crate::{
     error::{Error, ErrorKind},
@@ -40,61 +40,50 @@ impl InputLength for Parser<'_> {
 
 pub type IResult<'s, T> = nom::IResult<Parser<'s>, T, Error<'s>>;
 
-pub fn parse_gate(input: Parser<'_>) -> IResult<GateOnLanes> {
+pub fn parse_gate(input: Parser<'_>) -> IResult<CircuitGate> {
     let (input, gate) = parse_gate_kind(input)?;
-    let (input, lanes) = match gate {
-        Gate::PauliX(_)
-        | Gate::PauliY(_)
-        | Gate::PauliZ(_)
-        | Gate::Hadamard(_)
-        | Gate::Phase(_)
-        | Gate::Pi8(_) => {
-            let (input, lane) = parse_lane(input)?;
-            (input, lane..lane + 1)
-        }
-        Gate::CNOTup(_) | Gate::ConZ(_) | Gate::Swap(_) | Gate::Toffoli(_) => {
-            let (input, range) = parse_lanes_range(input)?;
-            (input, range)
-        }
-        _ => return Err(unexpected(input)),
+    let (input, span) = if gate.is_rank_one() {
+        parse_lane(input)?
+    } else {
+        parse_lanes_range(input)?
     };
-    Ok((input, GateOnLanes { gate, lanes }))
+    Ok((input, CircuitGate { kind: gate, span }))
 }
 
-fn parse_gate_kind(input: Parser<'_>) -> IResult<Gate> {
+fn parse_gate_kind(input: Parser<'_>) -> IResult<GateKind> {
     let (input, token) = expect_next(input)?;
     let kind = match token {
-        Token::GateX => Gate::PauliX(PauliX),
-        Token::GateY => Gate::PauliY(PauliY),
-        Token::GateZ => Gate::PauliZ(PauliZ),
-        Token::GateH => Gate::Hadamard(Hadamard),
-        Token::GateS => Gate::Phase(Phase),
-        Token::GateT => Gate::Pi8(Pi8),
-        Token::GateCNOT => Gate::CNOTup(CNOTup),
-        Token::GateCZED => Gate::ConZ(ConZ),
-        Token::GateSWAP => Gate::Swap(Swap),
-        Token::GateTOFF => Gate::Toffoli(Toffoli),
+        Token::GateX => GateKind::PauliX(PauliX),
+        Token::GateY => GateKind::PauliY(PauliY),
+        Token::GateZ => GateKind::PauliZ(PauliZ),
+        Token::GateH => GateKind::Hadamard(Hadamard),
+        Token::GateS => GateKind::Phase(Phase),
+        Token::GateT => GateKind::Pi8(Pi8),
+        Token::GateCNOT => GateKind::CNOTup(CNOTup),
+        Token::GateCZED => GateKind::ConZ(ConZ),
+        Token::GateSWAP => GateKind::Swap(Swap),
+        Token::GateTOFF => GateKind::Toffoli(Toffoli),
         _ => return Err(unexpected(input)),
     };
     Ok((input, kind))
 }
 
-fn parse_lane(input: Parser<'_>) -> IResult<usize> {
+fn parse_lane(input: Parser<'_>) -> IResult<GateSpan> {
     let (input, token) = expect_next(input)?;
     let lane = match token {
         Token::Lane(lane) => lane,
         _ => return Err(unexpected(input)),
     };
-    Ok((input, lane))
+    Ok((input, GateSpan::single(lane)))
 }
 
-fn parse_lanes_range(input: Parser<'_>) -> IResult<Range<usize>> {
+fn parse_lanes_range(input: Parser<'_>) -> IResult<GateSpan> {
     let (input, token) = expect_next(input)?;
     let range = match token {
         Token::LanesRange(range) => range,
         _ => return Err(unexpected(input)),
     };
-    Ok((input, range))
+    Ok((input, GateSpan::from(range)))
 }
 
 fn expect_next(mut input: Parser<'_>) -> IResult<Token> {
