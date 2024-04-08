@@ -483,6 +483,21 @@ impl std::fmt::Display for GateOnLanes {
     }
 }
 
+pub trait LaneAwareRank {
+    fn rank(&self) -> u8;
+    fn joined_rank(&self, other: &Self) -> u8;
+}
+
+impl LaneAwareRank for GateOnLanes {
+    fn rank(&self) -> u8 {
+        self.gate.rank()
+    }
+
+    fn joined_rank(&self, other: &Self) -> u8 {
+        (self.lanes.end.max(other.lanes.end) - self.lanes.start.min(other.lanes.start)) as u8
+    }
+}
+
 // @@@@@@@@@@@@@@@@@
 // @@ COMPUTATION @@
 // @@@@@@@@@@@@@@@@@

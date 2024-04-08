@@ -111,7 +111,9 @@ impl Instruction {
         let mut available_id = id + 1;
         let mut dependencies = Vec::new();
 
-        let Contraction { left, right, rank } = contr;
+        let Contraction {
+            left, right, rank, ..
+        } = contr;
 
         let first = if left.is_left() {
             let (left_instr, col) =
