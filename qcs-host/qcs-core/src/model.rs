@@ -5,11 +5,11 @@ use std::ops::{Mul, Range};
 use nalgebra::{Complex, DMatrix, DVector, Vector2};
 
 use crate::{
-    contractions::TensorNetwork,
     model::gates::{
         CNOTdown, CNOTup, ConZ, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Pi8, Swap,
         Toffoli,
     },
+    representations::contraction_graph::ContractionGraph,
 };
 
 use self::gates::{CircuitGate, GateSpan, QuantumGate};
@@ -178,7 +178,6 @@ impl QuantumCircuit {
         let mut circuit = (0..n_qubits).fold(Block::one(), |acc, _| acc.tensor_product(Identity));
         for (gate, qrange) in gates.into_iter().map(|g| g.deconstruct()) {
             let mut gate_block = gate.block();
-            // FIXME: this works only for 1-qubit gates
             let mut new_block = Block::one();
             for _ in 0..qrange.start() {
                 new_block = new_block.tensor_product(Identity);
@@ -193,7 +192,7 @@ impl QuantumCircuit {
         circuit
     }
 
-    pub fn into_contraction_graph(self) -> TensorNetwork {
+    pub fn into_contraction_graph(self) -> ContractionGraph {
         self.into()
     }
 }

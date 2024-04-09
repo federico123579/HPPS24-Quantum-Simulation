@@ -6,17 +6,16 @@ use petgraph::{
     Directed, Direction,
 };
 
-use crate::model::{
-    gates::{CircuitGate, GateSpan},
-    QuantumCircuit,
-};
+use crate::model::{gates::GateSpan, QuantumCircuit};
+
+use super::tensor_networks::{TensorContraction, TensorKind};
 
 #[derive(Debug, Clone)]
-pub struct TensorNetwork {
-    graph: StableGraph<ContractionItem, GateSpan, Directed>,
+pub struct ContractionGraph {
+    graph: StableGraph<TensorKind, GateSpan, Directed>,
 }
 
-impl TensorNetwork {
+impl ContractionGraph {
     fn find_edges(&self, rank: u8) -> Vec<EdgeReference<GateSpan>> {
         self.graph
             .edge_references()
@@ -39,8 +38,8 @@ impl TensorNetwork {
         let target_contr = self.graph.node_weight(target).unwrap().clone();
 
         // Create a new node with the two removed nodes as children
-        let new_contr = Contraction::new(source_contr, target_contr);
-        let contr_item = ContractionItem::from(new_contr);
+        let new_contr = TensorContraction::new(source_contr, target_contr);
+        let contr_item = TensorKind::from(new_contr);
 
         // Get the nodes linked to the source and target nodes
         let backlinks = self
@@ -91,7 +90,7 @@ impl TensorNetwork {
         self.graph.remove_node(target).unwrap();
     }
 
-    pub fn contract(mut self) -> Vec<ContractionItem> {
+    pub fn contract(mut self) -> Vec<TensorKind> {
         let mut curr_rank = 1;
         while self.graph.edge_count() > 0 {
             let edges = self
@@ -115,7 +114,7 @@ impl TensorNetwork {
     }
 }
 
-impl From<QuantumCircuit> for TensorNetwork {
+impl From<QuantumCircuit> for ContractionGraph {
     fn from(value: QuantumCircuit) -> Self {
         let QuantumCircuit { n_qubits, gates } = value;
         let mut graph = StableGraph::new();
@@ -136,107 +135,8 @@ impl From<QuantumCircuit> for TensorNetwork {
     }
 }
 
-impl std::fmt::Display for TensorNetwork {
+impl std::fmt::Display for ContractionGraph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", petgraph::dot::Dot::new(&self.graph))
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum ContractionItem {
-    Contraction(Box<Contraction>),
-    Gate(Box<CircuitGate>),
-}
-
-impl ContractionItem {
-    fn rank(&self) -> u8 {
-        match &self {
-            Self::Contraction(c) => c.rank,
-            Self::Gate(g) => g.rank(),
-        }
-    }
-
-    fn span(&self) -> &GateSpan {
-        match &self {
-            Self::Contraction(c) => &c.span,
-            Self::Gate(g) => &g.span,
-        }
-    }
-}
-
-impl From<Contraction> for ContractionItem {
-    fn from(value: Contraction) -> Self {
-        Self::Contraction(Box::new(value))
-    }
-}
-
-impl From<CircuitGate> for ContractionItem {
-    fn from(value: CircuitGate) -> Self {
-        Self::Gate(Box::new(value))
-    }
-}
-
-impl std::fmt::Display for ContractionItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Contraction(c) => write!(f, "{}", c),
-            Self::Gate(g) => write!(f, "{}", g),
-        }
-    }
-}
-
-// impl LaneAwareRank for ContractionItem {
-//     fn rank(&self) -> u8 {
-//         self.rank()
-//     }
-
-//     fn joined_rank(&self, other: &Self) -> u8 {
-//         match (&self.0, &other.0) {
-//             (Either::Left(l), Either::Left(r)) => l.joined_rank(r),
-//             (Either::Left(l), Either::Right(r)) => {
-//                 (l.span.end.max(r.span().end) - l.span.start.min(r.span().start)) as u8
-//             }
-//             (Either::Right(l), Either::Left(r)) => {
-//                 (l.span().end.max(r.span.end) - l.span().start.min(r.span.start)) as u8
-//             }
-//             (Either::Right(l), Either::Right(r)) => l.joined_rank(r),
-//         }
-//     }
-// }
-
-#[derive(Debug, Clone)]
-pub struct Contraction {
-    pub rank: u8,
-    pub span: GateSpan,
-    pub left: ContractionItem,
-    pub right: ContractionItem,
-}
-
-impl Contraction {
-    fn new(left: ContractionItem, right: ContractionItem) -> Self {
-        let span = left.span().merge(right.span());
-        let rank = span.span_len() as u8;
-        Self {
-            rank,
-            span,
-            left,
-            right,
-        }
-    }
-}
-
-impl std::fmt::Display for Contraction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} ~ {})", self.left, self.right)
-    }
-}
-
-// impl LaneAwareRank for Contraction {
-//     fn rank(&self) -> u8 {
-//         self.rank
-//     }
-
-//     fn joined_rank(&self, other: &Self) -> u8 {
-//         (self.span.end.max(other.span.end) - self.span.start.min(other.span.start)) as u8
-//     }
-// }

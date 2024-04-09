@@ -3,8 +3,8 @@ use std::usize;
 use hashbrown::HashMap;
 
 use crate::{
-    contractions::{Contraction, ContractionItem},
     model::gates::CircuitGate,
+    representations::tensor_networks::{TensorContraction, TensorKind},
 };
 
 pub struct ContractionPlan {
@@ -43,8 +43,8 @@ impl ContractionPlan {
     }
 }
 
-impl From<Contraction> for ContractionPlan {
-    fn from(contraction: Contraction) -> Self {
+impl From<TensorContraction> for ContractionPlan {
+    fn from(contraction: TensorContraction) -> Self {
         let (instruction, collaterals) = Instruction::from_contraction(0, contraction, vec![]);
 
         let instructions: HashMap<_, _> = collaterals
@@ -106,19 +106,22 @@ impl Instruction {
     /// Create a new instruction with the given id from a contraction, returns also collaterals
     fn from_contraction(
         id: usize,
-        contr: Contraction,
+        contr: TensorContraction,
         collaterals: Vec<Instruction>,
     ) -> (Self, Vec<Self>) {
         let mut collaterals = collaterals;
         let mut available_id = id + 1;
         let mut dependencies = Vec::new();
 
-        let Contraction {
-            left, right, rank, ..
+        let TensorContraction {
+            lhs: left,
+            rhs: right,
+            rank,
+            ..
         } = contr;
 
         let first = match left {
-            ContractionItem::Contraction(contr) => {
+            TensorKind::Contraction(contr) => {
                 let (instr, col) = Self::from_contraction(available_id, *contr, collaterals);
                 collaterals = col;
                 let instr_id = instr.id;
@@ -127,11 +130,11 @@ impl Instruction {
                 available_id += collaterals.len() + 1;
                 InstructionOperand::from(instr_id)
             }
-            ContractionItem::Gate(gate) => InstructionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => InstructionOperand::Gate(*gate),
         };
 
         let second = match right {
-            ContractionItem::Contraction(contr) => {
+            TensorKind::Contraction(contr) => {
                 let (instr, col) = Self::from_contraction(available_id, *contr, collaterals);
                 collaterals = col;
                 let instr_id = instr.id;
@@ -139,7 +142,7 @@ impl Instruction {
                 collaterals.push(instr);
                 InstructionOperand::from(instr_id)
             }
-            ContractionItem::Gate(gate) => InstructionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => InstructionOperand::Gate(*gate),
         };
 
         let instruction = Self {
