@@ -127,7 +127,7 @@ impl Instruction {
                 let instr_id = instr.id;
                 dependencies.push(instr_id);
                 collaterals.push(instr);
-                available_id += collaterals.len() + 1;
+                available_id = collaterals.iter().map(|i| i.id).max().unwrap() + 1;
                 InstructionOperand::from(instr_id)
             }
             TensorKind::Gate(gate) => InstructionOperand::Gate(*gate),
@@ -160,6 +160,14 @@ impl Instruction {
         &self.dependencies
     }
 }
+
+impl PartialEq for Instruction {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Instruction {}
 
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
