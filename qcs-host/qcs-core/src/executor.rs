@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 
 use crate::{
-    model::{gates::GateSpan, SpannedBlock},
+    model::SpannedBlock,
     scheduler::{Instruction, InstructionOperand},
 };
 

@@ -6,7 +6,7 @@ use petgraph::{
     Directed, Direction,
 };
 
-use crate::model::{gates::GateSpan, QuantumCircuit};
+use crate::{model::QuantumCircuit, utils::GateSpan};
 
 use super::tensor_networks::{TensorContraction, TensorKind};
 
@@ -56,7 +56,7 @@ impl ContractionGraph {
                     self.graph.node_weight(e.source()).unwrap().span(),
                 )
             })
-            .map(|(n, w)| (n, w.merge(contr_item.span())))
+            .map(|(n, w)| (n, w.full_join(contr_item.span())))
             .collect::<Vec<_>>();
         let frontlinks = self
             .graph
@@ -72,7 +72,7 @@ impl ContractionGraph {
                     self.graph.node_weight(e.target()).unwrap().span(),
                 )
             })
-            .map(|(n, w)| (n, w.merge(contr_item.span())))
+            .map(|(n, w)| (n, w.full_join(contr_item.span())))
             .collect::<Vec<_>>();
 
         // Link the new node to the previously linked nodes
@@ -126,7 +126,7 @@ impl From<QuantumCircuit> for ContractionGraph {
             for i in span.clone().into_range() {
                 let old = nodes[i].replace((node, span.clone()));
                 if let Some((old_ix, old_r)) = old {
-                    graph.add_edge(old_ix, node, span.merge(&old_r));
+                    graph.add_edge(old_ix, node, span.full_join(&old_r));
                 }
             }
         }

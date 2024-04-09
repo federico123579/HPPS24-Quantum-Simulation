@@ -1,23 +1,69 @@
-use crate::model::{
-    gates::{CircuitGate, GateSpan},
-    QuantumCircuit,
+use crate::{
+    model::{gates::CircuitGate, QuantumCircuit},
+    utils::{GateSpan, SpanRegister},
 };
 
 use super::contraction_graph::ContractionGraph;
 
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
-    nodes: Vec<TensorKind>,
-    edges: Vec<TensorEdges>,
+    nodes: Vec<Option<TensorKind>>,
+    pub edges: Vec<TensorEdge>,
+    dim: usize,
 }
 
 impl TensorNetwork {
-    pub fn contractable(&self) -> Vec<&TensorKind> {
-        // self.nodes
-        //     .iter()
-        //     .enumerate()
-        //     .filter(|(ix, _)| self.edges[*ix][e
-        todo!()
+    pub fn contractable(&self) -> Vec<&TensorEdge> {
+        self.edges
+            .iter()
+            .filter(|edge| {
+                let left = self.nodes[edge.left].as_ref().unwrap();
+                let right = self.nodes[edge.right].as_ref().unwrap();
+                left.span().inner_join(right.span()).unwrap() == edge.span
+            })
+            .collect()
+    }
+
+    pub fn contract(&mut self, edge: TensorEdge) {
+        // update nodes
+        let left = self.nodes[edge.left].take().unwrap();
+        let right = self.nodes[edge.right].take().unwrap();
+        let new_node = TensorKind::from(TensorContraction::new(left, right));
+        let new_ix = self.push_node(new_node);
+
+        // Update Edges
+        for e in self.edges.iter_mut() {
+            if e.right == edge.left || e.right == edge.right {
+                e.right = new_ix;
+                e.
+            } else if e.left == edge.left || e.left == edge.right {
+                e.left = new_ix;
+            }
+        }
+    }
+
+    pub fn contraction_rank(&self, edge: &TensorEdge) -> u8 {
+        let left = self.nodes[edge.left].as_ref().unwrap();
+        let right = self.nodes[edge.right].as_ref().unwrap();
+        left.span().full_join(right.span()).span_len() as u8
+    }
+
+    // fn edge_endpoints(&self, edge: &TensorEdge) -> (&TensorKind, &TensorKind) {
+    //     (
+    //         self.nodes[edge.left].as_ref().unwrap(),
+    //         self.nodes[edge.right].as_ref().unwrap(),
+    //     )
+    // }
+
+    fn push_node(&mut self, node: TensorKind) -> usize {
+        for (ix, n) in self.nodes.iter_mut().enumerate() {
+            if n.is_none() {
+                *n = Some(node);
+                return ix;
+            }
+        }
+        self.nodes.push(Some(node));
+        self.nodes.len() - 1
     }
 }
 
@@ -29,67 +75,47 @@ impl From<QuantumCircuit> for TensorNetwork {
         let mut edges = Vec::new();
 
         // This will be used as a vertical slice of the last gate in each qubit lane
-        let mut last_in_line = vec![None; n_qubits];
+        let mut span_register = SpanRegister::new(n_qubits);
 
         for (ix, gate) in gates.into_iter().enumerate() {
             let tensor = TensorKind::Gate(Box::new(gate));
-            tensor
-                .span()
-                .clone()
-                .into_range()
-                .for_each(|i| last_in_line[i] = Some(ix));
-            nodes.push(tensor);
-            let tensor_edges = last_in_line
-                .iter()
-                .map(|gate_ix| match gate_ix {
-                    Some(i) => TensorEdge::internal(*i),
-                    None => TensorEdge::external(),
-                })
-                .collect();
-            edges.push(TensorEdges::new(tensor_edges));
+            edges.extend(
+                span_register
+                    .get(tensor.span())
+                    .into_iter()
+                    .map(|(span, i)| TensorEdge::new(i, ix, span)),
+            );
+            span_register.apply(tensor.span().clone(), ix);
+            nodes.push(Some(tensor));
         }
 
-        Self { nodes, edges }
+        Self {
+            nodes,
+            edges,
+            dim: n_qubits,
+        }
     }
 }
 
-#[derive(Debug, Clone)]
-struct TensorEdges {
-    left: Vec<TensorEdge>,
-}
-
-impl TensorEdges {
-    fn new(edges: Vec<TensorEdge>) -> Self {
-        Self { left: edges }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct TensorEdge {
-    node_index: Option<usize>,
-    kind: EdgeKind,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TensorEdge {
+    left: usize,
+    right: usize,
+    span: GateSpan,
 }
 
 impl TensorEdge {
-    fn external() -> Self {
-        Self {
-            node_index: None,
-            kind: EdgeKind::External,
-        }
+    fn new(left: usize, right: usize, span: GateSpan) -> Self {
+        Self { left, right, span }
     }
 
-    fn internal(node_index: usize) -> Self {
-        Self {
-            node_index: Some(node_index),
-            kind: EdgeKind::Internal,
-        }
+    fn is_linked_to(&self, node: usize) -> bool {
+        self.left == node || self.right == node
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-enum EdgeKind {
-    External,
-    Internal,
+    fn is_linked_to_any(&self, nodes: &[usize]) -> bool {
+        nodes.contains(&self.left) || nodes.contains(&self.right)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +171,7 @@ pub struct TensorContraction {
 
 impl TensorContraction {
     pub fn new(left: TensorKind, right: TensorKind) -> Self {
-        let span = left.span().merge(right.span());
+        let span = left.span().full_join(right.span());
         let rank = span.span_len() as u8;
         Self {
             rank,

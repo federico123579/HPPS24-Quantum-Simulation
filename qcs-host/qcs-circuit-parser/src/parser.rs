@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use logos::{Lexer, Logos};
 use nom::InputLength;
-use qcs_core::model::gates::*;
+use qcs_core::{model::gates::*, utils::GateSpan};
 
 use crate::{
     error::{Error, ErrorKind},

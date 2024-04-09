@@ -1,7 +1,9 @@
-use std::{f64::consts::FRAC_PI_4, ops::Range};
+use std::f64::consts::FRAC_PI_4;
 
 use enum_dispatch::enum_dispatch;
 use nalgebra::{Complex, DMatrix};
+
+use crate::utils::GateSpan;
 
 use super::Block;
 
@@ -309,68 +311,5 @@ impl QuantumGate for Toffoli {
             ],
         )
         .map(|x| Complex::new(x, 0.0))
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GateSpan(Range<usize>);
-
-impl GateSpan {
-    #[inline]
-    pub fn single(lane: usize) -> Self {
-        GateSpan(lane..lane + 1)
-    }
-
-    #[inline]
-    pub fn range(range: Range<usize>) -> Self {
-        GateSpan(range)
-    }
-
-    #[inline]
-    pub fn start(&self) -> usize {
-        self.0.start
-    }
-
-    #[inline]
-    pub fn end(&self) -> usize {
-        self.0.end
-    }
-
-    #[inline]
-    pub fn span_len(&self) -> usize {
-        self.end() - self.start()
-    }
-
-    pub fn merge(&self, other: &Self) -> Self {
-        let start = self.start().min(other.start());
-        let end = self.end().max(other.end());
-        GateSpan(start..end)
-    }
-
-    pub fn into_range(self) -> Range<usize> {
-        self.0
-    }
-}
-
-impl std::fmt::Display for GateSpan {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}:{}]", self.start(), self.end() - 1)
-    }
-}
-
-impl From<Range<usize>> for GateSpan {
-    fn from(range: Range<usize>) -> Self {
-        GateSpan(range)
-    }
-}
-
-impl From<usize> for GateSpan {
-    fn from(lane: usize) -> Self {
-        GateSpan(lane..lane + 1)
-    }
-}
-
-impl From<GateSpan> for Range<usize> {
-    fn from(span: GateSpan) -> Self {
-        span.0
     }
 }
