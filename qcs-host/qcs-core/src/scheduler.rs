@@ -3,8 +3,8 @@ use std::usize;
 use hashbrown::HashMap;
 
 use crate::{
+    contractions::{TensorContraction, TensorKind},
     model::gates::CircuitGate,
-    representations::tensor_networks::{TensorContraction, TensorKind},
 };
 
 pub struct ContractionPlan {
