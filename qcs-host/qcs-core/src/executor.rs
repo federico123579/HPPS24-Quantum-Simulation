@@ -50,6 +50,7 @@ impl CpuExecutor {
 
     pub fn execute(&mut self, instructions: Vec<Instruction>) -> Vec<SpannedBlock> {
         for instruction in instructions {
+            // dbg!(&instruction);
             self.execute_single(instruction);
         }
         self.memory.drain().map(|(_, block)| block).collect()

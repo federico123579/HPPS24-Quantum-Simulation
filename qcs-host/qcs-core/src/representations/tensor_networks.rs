@@ -1,3 +1,4 @@
+use hashbrown::{HashMap, HashSet};
 use petgraph::{
     stable_graph::{EdgeIndex, EdgeReference, StableDiGraph},
     visit::{EdgeRef, IntoEdgeReferences},
@@ -17,7 +18,45 @@ pub struct TensorNetwork {
 }
 
 impl TensorNetwork {
-    pub fn contractable(&self) -> Vec<EdgeReference<MultipleSpan>> {
+    pub fn contract(mut self) -> Vec<TensorKind> {
+        println!("{}", self);
+        loop {
+            let lowest_rank = self
+                .contractable()
+                .into_iter()
+                .map(|e| self.contraction_rank(&e))
+                .min();
+            let Some(lowest_rank) = lowest_rank else {
+                break;
+            };
+
+            let mut visited = HashSet::new();
+            let to_contract = self
+                .contractable()
+                .into_iter()
+                .filter(|e| self.contraction_rank(e) == lowest_rank)
+                .filter(|e| {
+                    if !visited.contains(&e.source()) && !visited.contains(&e.target()) {
+                        visited.insert(e.source());
+                        visited.insert(e.target());
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .map(|e| e.id())
+                .collect::<Vec<_>>();
+
+            to_contract.into_iter().for_each(|to_contract| {
+                self.contract_edge(to_contract);
+            });
+            println!("{}", self);
+        }
+
+        self.graph.node_weights().cloned().collect()
+    }
+
+    fn contractable(&self) -> Vec<EdgeReference<MultipleSpan>> {
         self.graph
             .edge_references()
             .filter(|e| {
@@ -29,34 +68,54 @@ impl TensorNetwork {
             .collect()
     }
 
-    pub fn contract(&mut self, edge: EdgeIndex) {
+    fn contract_edge(&mut self, edge: EdgeIndex) {
         let (source, target) = self.graph.edge_endpoints(edge).unwrap();
 
-        let backlinks = self
-            .graph
+        let mut backlinks = HashMap::new();
+        self.graph
             .edges_directed(source, Direction::Incoming)
             .chain(self.graph.edges_directed(target, Direction::Incoming))
             .filter(|e| e.source() != target && e.source() != source)
             .map(|e| (e.source(), e.weight().clone()))
-            .collect::<Vec<_>>();
-        let frontlinks = self
-            .graph
+            .for_each(|(n, s)| {
+                let span = backlinks
+                    .remove(&n)
+                    .map(|ms: MultipleSpan| ms.full_join(&s))
+                    .unwrap_or_else(|| s.clone());
+                backlinks.insert(n, span);
+            });
+        let mut frontlinks = HashMap::new();
+        self.graph
             .edges_directed(target, Direction::Outgoing)
             .chain(self.graph.edges_directed(source, Direction::Outgoing))
             .filter(|e| e.target() != target && e.target() != source)
             .map(|e| (e.target(), e.weight().clone()))
-            .collect::<Vec<_>>();
+            .for_each(|(n, s)| {
+                let span = frontlinks
+                    .remove(&n)
+                    .map(|ms: MultipleSpan| ms.full_join(&s))
+                    .unwrap_or_else(|| s.clone());
+                frontlinks.insert(n, span);
+            });
 
         let source_contr = self.graph.remove_node(source).unwrap();
         let target_contr = self.graph.remove_node(target).unwrap();
-        todo!()
+        let new_contr = TensorContraction::new(source_contr, target_contr);
+        let new_node = self.graph.add_node(new_contr.into());
+
+        for (node, span) in backlinks {
+            self.graph.add_edge(node, new_node, span);
+        }
+        for (node, span) in frontlinks {
+            self.graph.add_edge(new_node, node, span);
+        }
     }
 
-    // pub fn contraction_rank(&self, edge: &TensorEdge) -> u8 {
-    //     let left = self.nodes[edge.left].as_ref().unwrap();
-    //     let right = self.nodes[edge.right].as_ref().unwrap();
-    //     left.span().full_join(right.span()).span_len() as u8
-    // }
+    pub fn contraction_rank(&self, edge: &EdgeReference<MultipleSpan>) -> u8 {
+        let source = self.graph.node_weight(edge.source()).unwrap();
+        let target = self.graph.node_weight(edge.target()).unwrap();
+        source.span().full_join(target.span()).span_len() as u8
+    }
 
     // // fn edge_endpoints(&self, edge: &TensorEdge) -> (&TensorKind, &TensorKind) {
     // //     (
@@ -90,7 +149,7 @@ impl From<QuantumCircuit> for TensorNetwork {
             let linked_spans = span_register.get(&current_span.clone().into());
             span_register.apply(current_span.into(), new_node);
             for (span, node) in linked_spans {
-                graph.add_edge(new_node, node, span);
+                graph.add_edge(node, new_node, span);
             }
         }
         Self { graph }
@@ -110,12 +169,12 @@ pub enum TensorKind {
 }
 
 impl TensorKind {
-    fn rank(&self) -> u8 {
-        match &self {
-            Self::Contraction(c) => c.rank,
-            Self::Gate(g) => g.rank(),
-        }
-    }
+    // fn rank(&self) -> u8 {
+    //     match &self {
+    //         Self::Contraction(c) => c.rank,
+    //         Self::Gate(g) => g.rank(),
+    //     }
+    // }
 
     pub fn span(&self) -> &GateSpan {
         match &self {
