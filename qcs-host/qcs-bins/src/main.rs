@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
+    contractions::{TensorKind, TensorNetwork},
     executor::CpuExecutor,
     model::{QRegister, Qubit, TensorProduct},
-    representations::tensor_networks::{TensorKind, TensorNetwork},
     scheduler::ContractionPlan,
 };
 
