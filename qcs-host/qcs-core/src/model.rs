@@ -9,10 +9,11 @@ use crate::{
         CNOTdown, CNOTup, ConZ, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Pi8, Swap,
         Toffoli,
     },
-    representations::contraction_graph::ContractionGraph,
+    // representations::contraction_graph::ContractionGraph,
+    utils::GateSpan,
 };
 
-use self::gates::{CircuitGate, GateSpan, QuantumGate};
+use self::gates::{CircuitGate, QuantumGate};
 
 // @@@@@@@@@@@@
 // @@ Qubits @@
@@ -109,7 +110,6 @@ impl QuantumCircuit {
     }
 
     pub fn push_gate(&mut self, gate: CircuitGate) {
-        assert!(gate.span.end() <= self.n_qubits);
         self.gates.push(gate);
     }
 
@@ -192,9 +192,9 @@ impl QuantumCircuit {
         circuit
     }
 
-    pub fn into_contraction_graph(self) -> ContractionGraph {
-        self.into()
-    }
+    // pub fn into_contraction_graph(self) -> ContractionGraph {
+    //     self.into()
+    // }
 }
 
 // @@@@@@@@@@@@@@@@@
@@ -227,7 +227,7 @@ impl SpannedBlock {
     }
 
     pub fn merged_span(&self, rhs: &SpannedBlock) -> GateSpan {
-        self.span.merge(&rhs.span)
+        self.span.full_join(&rhs.span)
     }
 
     pub fn adapt_to_span(mut self, span: GateSpan) -> Self {
@@ -268,7 +268,7 @@ impl TensorProduct for SpannedBlock {
         let rhs = rhs.into();
         SpannedBlock {
             block: &self.block * &rhs.block,
-            span: self.span.merge(&rhs.span),
+            span: self.span.full_join(&rhs.span),
         }
     }
 }
@@ -280,7 +280,7 @@ impl Mul<&SpannedBlock> for &SpannedBlock {
         assert_eq!(self.span, rhs.span, "Incompatible spans");
         SpannedBlock {
             block: &self.block * &rhs.block,
-            span: self.span.merge(&rhs.span),
+            span: self.span.full_join(&rhs.span),
         }
     }
 }
@@ -292,7 +292,7 @@ impl Mul<SpannedBlock> for SpannedBlock {
         assert_eq!(self.span, rhs.span, "Incompatible spans");
         SpannedBlock {
             block: &self.block * &rhs.block,
-            span: self.span.merge(&rhs.span),
+            span: self.span.full_join(&rhs.span),
         }
     }
 }

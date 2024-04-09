@@ -20,7 +20,8 @@ fn main() {
     let circuit = parse_program(&input_txt).unwrap();
 
     let tensor_net = TensorNetwork::from(circuit);
-    dbg!(tensor_net);
+    println!("{}", tensor_net);
+    println!("{:?}", tensor_net.contractable());
 
     // let contr_graph = circuit.clone().into_contraction_graph();
     // let mut contracted_nodes = contr_graph.contract().into_iter();

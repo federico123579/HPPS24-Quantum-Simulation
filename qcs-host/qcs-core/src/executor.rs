@@ -1,11 +1,11 @@
 use hashbrown::HashMap;
 
 use crate::{
-    model::{gates::GateSpan, SpannedBlock},
+    model::SpannedBlock,
     scheduler::{Instruction, InstructionOperand},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CpuExecutor {
     memory: HashMap<usize, SpannedBlock>,
 }
