@@ -1,120 +1,105 @@
-use crate::{
-    model::{gates::CircuitGate, QuantumCircuit},
-    utils::{GateSpan, SpanRegister},
+use petgraph::{
+    stable_graph::{EdgeIndex, EdgeReference, StableDiGraph},
+    visit::{EdgeRef, IntoEdgeReferences},
+    Direction,
 };
 
-use super::contraction_graph::ContractionGraph;
+use crate::{
+    model::{gates::CircuitGate, QuantumCircuit},
+    utils::{GateSpan, MultipleSpan, SpanRegister},
+};
+
+// use super::contraction_graph::ContractionGraph;
 
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
-    nodes: Vec<Option<TensorKind>>,
-    pub edges: Vec<TensorEdge>,
-    dim: usize,
+    graph: StableDiGraph<TensorKind, MultipleSpan>,
 }
 
 impl TensorNetwork {
-    pub fn contractable(&self) -> Vec<&TensorEdge> {
-        self.edges
-            .iter()
-            .filter(|edge| {
-                let left = self.nodes[edge.left].as_ref().unwrap();
-                let right = self.nodes[edge.right].as_ref().unwrap();
-                left.span().inner_join(right.span()).unwrap() == edge.span
+    pub fn contractable(&self) -> Vec<EdgeReference<MultipleSpan>> {
+        self.graph
+            .edge_references()
+            .filter(|e| {
+                let source = self.graph.node_weight(e.source()).unwrap();
+                let target = self.graph.node_weight(e.target()).unwrap();
+                let max_span = source.span().inner_join(target.span()).unwrap();
+                e.weight() == &max_span.into()
             })
             .collect()
     }
 
-    pub fn contract(&mut self, edge: TensorEdge) {
-        // update nodes
-        let left = self.nodes[edge.left].take().unwrap();
-        let right = self.nodes[edge.right].take().unwrap();
-        let new_node = TensorKind::from(TensorContraction::new(left, right));
-        let new_ix = self.push_node(new_node);
+    pub fn contract(&mut self, edge: EdgeIndex) {
+        let (source, target) = self.graph.edge_endpoints(edge).unwrap();
 
-        // Update Edges
-        for e in self.edges.iter_mut() {
-            if e.right == edge.left || e.right == edge.right {
-                e.right = new_ix;
-                e.
-            } else if e.left == edge.left || e.left == edge.right {
-                e.left = new_ix;
-            }
-        }
+        let backlinks = self
+            .graph
+            .edges_directed(source, Direction::Incoming)
+            .chain(self.graph.edges_directed(target, Direction::Incoming))
+            .filter(|e| e.source() != target && e.source() != source)
+            .map(|e| (e.source(), e.weight().clone()))
+            .collect::<Vec<_>>();
+        let frontlinks = self
+            .graph
+            .edges_directed(target, Direction::Outgoing)
+            .chain(self.graph.edges_directed(source, Direction::Outgoing))
+            .filter(|e| e.target() != target && e.target() != source)
+            .map(|e| (e.target(), e.weight().clone()))
+            .collect::<Vec<_>>();
+
+        let source_contr = self.graph.remove_node(source).unwrap();
+        let target_contr = self.graph.remove_node(target).unwrap();
+        todo!()
     }
 
-    pub fn contraction_rank(&self, edge: &TensorEdge) -> u8 {
-        let left = self.nodes[edge.left].as_ref().unwrap();
-        let right = self.nodes[edge.right].as_ref().unwrap();
-        left.span().full_join(right.span()).span_len() as u8
-    }
-
-    // fn edge_endpoints(&self, edge: &TensorEdge) -> (&TensorKind, &TensorKind) {
-    //     (
-    //         self.nodes[edge.left].as_ref().unwrap(),
-    //         self.nodes[edge.right].as_ref().unwrap(),
-    //     )
+    // pub fn contraction_rank(&self, edge: &TensorEdge) -> u8 {
+    //     let left = self.nodes[edge.left].as_ref().unwrap();
+    //     let right = self.nodes[edge.right].as_ref().unwrap();
+    //     left.span().full_join(right.span()).span_len() as u8
     // }
 
-    fn push_node(&mut self, node: TensorKind) -> usize {
-        for (ix, n) in self.nodes.iter_mut().enumerate() {
-            if n.is_none() {
-                *n = Some(node);
-                return ix;
-            }
-        }
-        self.nodes.push(Some(node));
-        self.nodes.len() - 1
-    }
+    // // fn edge_endpoints(&self, edge: &TensorEdge) -> (&TensorKind, &TensorKind) {
+    // //     (
+    // //         self.nodes[edge.left].as_ref().unwrap(),
+    // //         self.nodes[edge.right].as_ref().unwrap(),
+    // //     )
+    // // }
+
+    // fn push_node(&mut self, node: TensorKind) -> usize {
+    //     for (ix, n) in self.nodes.iter_mut().enumerate() {
+    //         if n.is_none() {
+    //             *n = Some(node);
+    //             return ix;
+    //         }
+    //     }
+    //     self.nodes.push(Some(node));
+    //     self.nodes.len() - 1
+    // }
 }
 
 impl From<QuantumCircuit> for TensorNetwork {
     fn from(circuit: QuantumCircuit) -> Self {
-        let QuantumCircuit { n_qubits, gates } = circuit;
-
-        let mut nodes = Vec::new();
-        let mut edges = Vec::new();
-
+        let QuantumCircuit { gates, .. } = circuit;
+        let mut graph = StableDiGraph::new();
         // This will be used as a vertical slice of the last gate in each qubit lane
-        let mut span_register = SpanRegister::new(n_qubits);
-
-        for (ix, gate) in gates.into_iter().enumerate() {
+        let mut span_register = SpanRegister::new();
+        for gate in gates.into_iter() {
             let tensor = TensorKind::Gate(Box::new(gate));
-            edges.extend(
-                span_register
-                    .get(tensor.span())
-                    .into_iter()
-                    .map(|(span, i)| TensorEdge::new(i, ix, span)),
-            );
-            span_register.apply(tensor.span().clone(), ix);
-            nodes.push(Some(tensor));
+            let current_span = tensor.span().clone();
+            let new_node = graph.add_node(tensor);
+            let linked_spans = span_register.get(&current_span.clone().into());
+            span_register.apply(current_span.into(), new_node);
+            for (span, node) in linked_spans {
+                graph.add_edge(new_node, node, span);
+            }
         }
-
-        Self {
-            nodes,
-            edges,
-            dim: n_qubits,
-        }
+        Self { graph }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TensorEdge {
-    left: usize,
-    right: usize,
-    span: GateSpan,
-}
-
-impl TensorEdge {
-    fn new(left: usize, right: usize, span: GateSpan) -> Self {
-        Self { left, right, span }
-    }
-
-    fn is_linked_to(&self, node: usize) -> bool {
-        self.left == node || self.right == node
-    }
-
-    fn is_linked_to_any(&self, nodes: &[usize]) -> bool {
-        nodes.contains(&self.left) || nodes.contains(&self.right)
+impl std::fmt::Display for TensorNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", petgraph::dot::Dot::new(&self.graph))
     }
 }
 

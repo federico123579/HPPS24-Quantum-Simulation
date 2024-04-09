@@ -9,7 +9,7 @@ use crate::{
         CNOTdown, CNOTup, ConZ, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Pi8, Swap,
         Toffoli,
     },
-    representations::contraction_graph::ContractionGraph,
+    // representations::contraction_graph::ContractionGraph,
     utils::GateSpan,
 };
 
@@ -110,7 +110,6 @@ impl QuantumCircuit {
     }
 
     pub fn push_gate(&mut self, gate: CircuitGate) {
-        assert!(gate.span.end() <= self.n_qubits);
         self.gates.push(gate);
     }
 
@@ -193,9 +192,9 @@ impl QuantumCircuit {
         circuit
     }
 
-    pub fn into_contraction_graph(self) -> ContractionGraph {
-        self.into()
-    }
+    // pub fn into_contraction_graph(self) -> ContractionGraph {
+    //     self.into()
+    // }
 }
 
 // @@@@@@@@@@@@@@@@@

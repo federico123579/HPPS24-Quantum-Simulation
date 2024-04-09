@@ -123,7 +123,7 @@ impl From<QuantumCircuit> for ContractionGraph {
         for gl in gates {
             let span = gl.span().to_owned();
             let node = graph.add_node(gl.into());
-            for i in span.clone().into_range() {
+            for i in span {
                 let old = nodes[i].replace((node, span.clone()));
                 if let Some((old_ix, old_r)) = old {
                     graph.add_edge(old_ix, node, span.full_join(&old_r));

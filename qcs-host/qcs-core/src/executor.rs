@@ -5,7 +5,7 @@ use crate::{
     scheduler::{Instruction, InstructionOperand},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CpuExecutor {
     memory: HashMap<usize, SpannedBlock>,
 }
