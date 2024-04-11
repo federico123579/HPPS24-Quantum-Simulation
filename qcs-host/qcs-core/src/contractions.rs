@@ -10,8 +10,6 @@ use crate::{
     utils::{GateSpan, MultipleSpan, SpanRegister},
 };
 
-// use super::contraction_graph::ContractionGraph;
-
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
     graph: StableDiGraph<TensorKind, MultipleSpan>,
@@ -116,24 +114,6 @@ impl TensorNetwork {
         let target = self.graph.node_weight(edge.target()).unwrap();
         source.span().full_join(target.span()).span_len() as u8
     }
-
-    // // fn edge_endpoints(&self, edge: &TensorEdge) -> (&TensorKind, &TensorKind) {
-    // //     (
-    // //         self.nodes[edge.left].as_ref().unwrap(),
-    // //         self.nodes[edge.right].as_ref().unwrap(),
-    // //     )
-    // // }
-
-    // fn push_node(&mut self, node: TensorKind) -> usize {
-    //     for (ix, n) in self.nodes.iter_mut().enumerate() {
-    //         if n.is_none() {
-    //             *n = Some(node);
-    //             return ix;
-    //         }
-    //     }
-    //     self.nodes.push(Some(node));
-    //     self.nodes.len() - 1
-    // }
 }
 
 impl From<QuantumCircuit> for TensorNetwork {
@@ -169,13 +149,6 @@ pub enum TensorKind {
 }
 
 impl TensorKind {
-    // fn rank(&self) -> u8 {
-    //     match &self {
-    //         Self::Contraction(c) => c.rank,
-    //         Self::Gate(g) => g.rank(),
-    //     }
-    // }
-
     pub fn span(&self) -> &GateSpan {
         match &self {
             Self::Contraction(c) => &c.span,
