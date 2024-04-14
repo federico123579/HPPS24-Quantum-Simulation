@@ -1,3 +1,5 @@
+use std::error::Error as StdError;
+
 use nom::error::ParseError;
 
 use crate::parser::Parser;
@@ -7,6 +9,20 @@ pub struct Error<'s> {
     pub input: Parser<'s>,
     pub span: std::ops::Range<usize>,
     pub kind: ErrorKind,
+}
+
+impl StdError for Error<'_> {}
+
+impl std::fmt::Display for Error<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{kind} at {span:?}: {input:?}",
+            kind = self.kind,
+            span = self.span,
+            input = self.input
+        )
+    }
 }
 
 impl<'s> ParseError<Parser<'s>> for Error<'s> {
@@ -29,4 +45,15 @@ pub enum ErrorKind {
     UnexpectedToken,
     UnexpectedEoF,
     NomError(nom::error::ErrorKind),
+}
+
+impl std::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::InvalidToken => write!(f, "Invalid token"),
+            ErrorKind::UnexpectedToken => write!(f, "Unexpected token"),
+            ErrorKind::UnexpectedEoF => write!(f, "Unexpected end of file"),
+            ErrorKind::NomError(kind) => write!(f, "Nom error: {:?}", kind),
+        }
+    }
 }
