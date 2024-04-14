@@ -5,14 +5,15 @@ use petgraph::{
     Direction,
 };
 
-use crate::{
-    model::{gates::CircuitGate, QuantumCircuit},
-    utils::{GateSpan, MultipleSpan, SpanRegister},
+use crate::model::{
+    gates::{Gate, QuantumGate},
+    span::{Span, SpanRegister},
+    QuantumCircuit,
 };
 
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
-    graph: StableDiGraph<TensorKind, MultipleSpan>,
+    graph: StableDiGraph<TensorKind, Span>,
 }
 
 impl TensorNetwork {
@@ -54,14 +55,14 @@ impl TensorNetwork {
         self.graph.node_weights().cloned().collect()
     }
 
-    fn contractable(&self) -> Vec<EdgeReference<MultipleSpan>> {
+    fn contractable(&self) -> Vec<EdgeReference<Span>> {
         self.graph
             .edge_references()
             .filter(|e| {
                 let source = self.graph.node_weight(e.source()).unwrap();
                 let target = self.graph.node_weight(e.target()).unwrap();
-                let max_span = source.span().inner_join(target.span()).unwrap();
-                e.weight() == &max_span.into()
+                let max_span = source.span().inner_join(&target.span()).unwrap();
+                e.weight() == &max_span
             })
             .collect()
     }
@@ -78,7 +79,7 @@ impl TensorNetwork {
             .for_each(|(n, s)| {
                 let span = backlinks
                     .remove(&n)
-                    .map(|ms: MultipleSpan| ms.full_join(&s))
+                    .map(|ms: Span| ms.full_join(&s))
                     .unwrap_or_else(|| s.clone());
                 backlinks.insert(n, span);
             });
@@ -91,7 +92,7 @@ impl TensorNetwork {
             .for_each(|(n, s)| {
                 let span = frontlinks
                     .remove(&n)
-                    .map(|ms: MultipleSpan| ms.full_join(&s))
+                    .map(|ms: Span| ms.full_join(&s))
                     .unwrap_or_else(|| s.clone());
                 frontlinks.insert(n, span);
             });
@@ -109,10 +110,10 @@ impl TensorNetwork {
         }
     }
 
-    pub fn contraction_rank(&self, edge: &EdgeReference<MultipleSpan>) -> u8 {
+    pub fn contraction_rank(&self, edge: &EdgeReference<Span>) -> u8 {
         let source = self.graph.node_weight(edge.source()).unwrap();
         let target = self.graph.node_weight(edge.target()).unwrap();
-        source.span().full_join(target.span()).span_len() as u8
+        source.span().full_join(&target.span()).span_len() as u8
     }
 }
 
@@ -126,8 +127,8 @@ impl From<QuantumCircuit> for TensorNetwork {
             let tensor = TensorKind::Gate(Box::new(gate));
             let current_span = tensor.span().clone();
             let new_node = graph.add_node(tensor);
-            let linked_spans = span_register.get(&current_span.clone().into());
-            span_register.apply(current_span.into(), new_node);
+            let linked_spans = span_register.get(&current_span.clone());
+            span_register.apply(current_span, new_node);
             for (span, node) in linked_spans {
                 graph.add_edge(node, new_node, span);
             }
@@ -145,14 +146,14 @@ impl std::fmt::Display for TensorNetwork {
 #[derive(Debug, Clone)]
 pub enum TensorKind {
     Contraction(Box<TensorContraction>),
-    Gate(Box<CircuitGate>),
+    Gate(Box<Gate>),
 }
 
 impl TensorKind {
-    pub fn span(&self) -> &GateSpan {
-        match &self {
-            Self::Contraction(c) => &c.span,
-            Self::Gate(g) => &g.span,
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Contraction(c) => c.span.clone(),
+            Self::Gate(g) => g.span(),
         }
     }
 }
@@ -163,8 +164,8 @@ impl From<TensorContraction> for TensorKind {
     }
 }
 
-impl From<CircuitGate> for TensorKind {
-    fn from(value: CircuitGate) -> Self {
+impl From<Gate> for TensorKind {
+    fn from(value: Gate) -> Self {
         Self::Gate(Box::new(value))
     }
 }
@@ -181,14 +182,14 @@ impl std::fmt::Display for TensorKind {
 #[derive(Debug, Clone)]
 pub struct TensorContraction {
     pub rank: u8,
-    pub span: GateSpan,
+    pub span: Span,
     pub lhs: TensorKind,
     pub rhs: TensorKind,
 }
 
 impl TensorContraction {
     pub fn new(left: TensorKind, right: TensorKind) -> Self {
-        let span = left.span().full_join(right.span());
+        let span = left.span().full_join(&right.span());
         let rank = span.span_len() as u8;
         Self {
             rank,

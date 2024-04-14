@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 
 use crate::{
     contractions::{TensorContraction, TensorKind},
-    model::gates::CircuitGate,
+    model::gates::Gate,
 };
 
 pub struct ContractionPlan {
@@ -181,12 +181,12 @@ impl std::fmt::Display for Instruction {
 
 #[derive(Debug, Clone)]
 pub enum InstructionOperand {
-    Gate(CircuitGate),
+    Gate(Gate),
     Address(usize),
 }
 
-impl From<CircuitGate> for InstructionOperand {
-    fn from(gate: CircuitGate) -> Self {
+impl From<Gate> for InstructionOperand {
+    fn from(gate: Gate) -> Self {
         Self::Gate(gate)
     }
 }

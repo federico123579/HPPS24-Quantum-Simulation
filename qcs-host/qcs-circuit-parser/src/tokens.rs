@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq, Logos)]
@@ -17,41 +15,37 @@ pub enum Token {
     #[token("H")]
     GateH,
 
-    #[token("S")]
-    GateS,
+    #[regex("P\\([0-9]+.?[0-9]*\\)", parse_phase)]
+    GateP(f64),
 
-    #[token("T")]
-    GateT,
+    #[token("CX")]
+    GateCX,
 
-    #[token("CNOT")]
-    GateCNOT,
+    #[token("CY")]
+    GateCY,
 
-    #[token("CZED")]
-    GateCZED,
+    #[token("CZ")]
+    GateCZ,
 
     #[token("SWAP")]
     GateSWAP,
 
-    #[token("TOFF")]
+    #[token("CCX")]
     GateTOFF,
 
-    #[regex("\\[[0-9]+\\]", parse_lane)]
-    Lane(usize),
-
-    #[regex("\\[[0-9]+:[0-9]+\\]", parse_lanes_range)]
-    LanesRange(Range<usize>),
+    #[regex("\\[[0-9]+ *(, *[0-9]+)*\\]", parse_lanes)]
+    Lanes(Vec<usize>),
 }
 
-/// Parse from [0] to 0
-fn parse_lane(s: &mut logos::Lexer<'_, Token>) -> usize {
-    s.slice()[1..s.slice().len() - 1].parse().unwrap()
+/// Parse phase from P(0.5) to 0.5
+fn parse_phase(s: &mut logos::Lexer<'_, Token>) -> f64 {
+    s.slice()[2..s.slice().len() - 1].parse().unwrap()
 }
 
-/// Parse from [0:1] to 0..2
-fn parse_lanes_range(s: &mut logos::Lexer<'_, Token>) -> Range<usize> {
-    let slice = s.slice();
-    let mut split = slice[1..slice.len() - 1].split(':');
-    let start = split.next().unwrap().parse().unwrap();
-    let end: usize = split.next().unwrap().parse().unwrap();
-    start..end + 1
+/// Parse from [2,1] to vec![2, 1]
+fn parse_lanes(s: &mut logos::Lexer<'_, Token>) -> Vec<usize> {
+    s.slice()[1..s.slice().len() - 1]
+        .split(',')
+        .map(|s| s.trim().parse().unwrap())
+        .collect()
 }
