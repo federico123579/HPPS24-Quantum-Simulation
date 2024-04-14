@@ -1,3 +1,9 @@
+//! The quantum model module contains the basic structures for quantum computing.
+//!
+//! The `Qubit` struct represents a single qubit, which is a quantum system with two states.
+//! The `QRegister` struct represents a quantum register, which is a collection of qubits.
+//! The `QuantumCircuit` struct represents a quantum circuit, which is a sequence of quantum gates.
+
 pub mod blocks;
 pub mod gates;
 pub mod span;
@@ -18,30 +24,44 @@ use self::{
 // @@ Qubits @@
 // @@@@@@@@@@@@
 
+/// A qubit is a quantum system with two states, |0⟩ and |1⟩.
+/// It can be represented as a linear combination of these states:
+/// |ψ⟩ = α|0⟩ + β|1⟩
+/// where α and β are complex numbers.
+///
+/// The probability of measuring the qubit in state |0⟩ is |α|² and in state |1⟩ is |β|².
+/// The qubit is normalized if |α|² + |β|² = 1.
+/// The amplitudes α and β are stored in a 2-dimensional vector.
+///
+/// The qubit can be initialized as |0⟩, |1⟩ or with custom amplitudes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Qubit {
     amplitudes: Vector2<Complex<f64>>,
 }
 
 impl Qubit {
+    /// Creates a new qubit with custom amplitudes.
     pub fn new(alpha: Complex<f64>, beta: Complex<f64>) -> Self {
         Qubit {
             amplitudes: Vector2::new(alpha, beta),
         }
     }
 
+    /// Creates the qubit |0⟩.
     pub fn zero() -> Self {
         Qubit {
             amplitudes: Vector2::new(Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)),
         }
     }
 
+    /// Creates the qubit |1⟩.
     pub fn one() -> Self {
         Qubit {
             amplitudes: Vector2::new(Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)),
         }
     }
 
+    /// Returns the distribution of the qubit.
     pub fn distr(&self) -> Vector2<f64> {
         self.amplitudes.map(|x| x.norm_sqr())
     }
@@ -65,12 +85,14 @@ impl From<Qubit> for DVector<Complex<f64>> {
     }
 }
 
+/// A quantum register is a collection of qubits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QRegister {
     qubits: DVector<Complex<f64>>,
 }
 
 impl QRegister {
+    /// Returns the distribution of the register.
     pub fn distr(&self) -> DVector<f64> {
         let iter = self.qubits.iter().map(|x| x.norm_sqr());
         DVector::from_iterator(self.qubits.len(), iter)
@@ -118,6 +140,14 @@ impl<B: IntoIterator<Item = Qubit>> From<B> for QRegister {
 // @@ Circuit @@
 // @@@@@@@@@@@@@
 
+/// A quantum circuit is a sequence of quantum gates that are applied to a quantum register.
+/// The gates are applied in order from left to right.
+/// The circuit is initialized with a number of qubits and an empty list of gates.
+///
+/// The gates can be added to the circuit using the `push_gate` method.
+/// The circuit can be evaluated to a block using the `eval` method.
+///
+/// The circuit can also be built using the methods that correspond to the quantum gates.
 #[derive(Debug, Clone)]
 pub struct QuantumCircuit {
     pub n_qubits: usize,
@@ -125,6 +155,7 @@ pub struct QuantumCircuit {
 }
 
 impl QuantumCircuit {
+    /// Creates a new quantum circuit with a number of qubits.
     pub fn new(n_qubits: usize) -> Self {
         QuantumCircuit {
             n_qubits,
@@ -132,65 +163,78 @@ impl QuantumCircuit {
         }
     }
 
+    /// Adds a gate to the circuit.
     pub fn push_gate(&mut self, gate: Gate) {
         self.gates.push(gate);
     }
 
+    /// Adds the Identity gate to the circuit.
     pub fn g_id(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(Identity::new(qix).into());
     }
 
+    /// Adds the Pauli-X gate to the circuit.
     pub fn g_x(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(PauliX::new(qix).into());
     }
 
+    /// Adds the Pauli-Y gate to the circuit.
     pub fn g_y(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(PauliY::new(qix).into());
     }
 
+    /// Adds the Pauli-Z gate to the circuit.
     pub fn g_z(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(PauliZ::new(qix).into());
     }
 
+    /// Adds the Hadamard gate to the circuit.
     pub fn g_h(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(Hadamard::new(qix).into());
     }
 
+    /// Adds the Phase gate to the circuit.
     pub fn g_p(&mut self, phase: f64, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(Phase::new(phase, qix).into());
     }
 
+    /// Adds the T gate to the circuit.
     pub fn g_t(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
         self.gates.push(Phase::pi8(qix).into());
     }
 
+    /// Adds the S gate to the circuit.
     pub fn g_cx(&mut self, qix_control: usize, qix_target: usize) {
         assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
         self.gates.push(CX::new(qix_control, qix_target).into());
     }
 
+    /// Adds the CY gate to the circuit.
     pub fn g_cy(&mut self, qix_control: usize, qix_target: usize) {
         assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
         self.gates.push(CY::new(qix_control, qix_target).into());
     }
 
+    /// Adds the CZ gate to the circuit.
     pub fn g_cz(&mut self, qix_control: usize, qix_target: usize) {
         assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
         self.gates.push(CZ::new(qix_control, qix_target).into());
     }
 
+    /// Adds the SWAP gate to the circuit.
     pub fn g_swap(&mut self, qix1: usize, qix2: usize) {
         assert!(qix1 < self.n_qubits && qix2 < self.n_qubits);
         self.gates.push(Swap::new(qix1, qix2).into());
     }
 
+    /// Adds the Toffoli gate to the circuit.
     pub fn g_toff(&mut self, qix_control1: usize, qix_control2: usize, qix_target: usize) {
         assert!(
             qix_control1 < self.n_qubits
@@ -201,6 +245,8 @@ impl QuantumCircuit {
             .push(Toffoli::new((qix_control1, qix_control2), qix_target).into());
     }
 
+    /// Evaluates the circuit to a single block, equivalent to the matrix
+    /// representation of the whole circuit.
     pub fn eval(self) -> Block {
         let Self { n_qubits, gates } = self;
         let mut circuit =
@@ -227,9 +273,20 @@ impl QuantumCircuit {
 // @@ COMPUTATION @@
 // @@@@@@@@@@@@@@@@@
 
+/// An interface for tensor product operations.
 pub trait TensorProduct<Rhs = Self> {
     type Output;
 
+    /// Computes the tensor product of two objects.
+    /// An example of tensor product of two matrices A and B:
+    /// ```text
+    /// A ⊗ B = [a₁₁B a₁₂B ... a₁ₘB]
+    ///         [a₂₁B a₂₂B ... a₂ₘB]
+    ///         [...  ...  ... ... ]
+    ///         [aₙ₁B  aₙ₂B ... aₙₘB]
+    /// ```
+    /// where A is an n×m matrix and B is an p×q matrix.
+    /// The result is an np×mq matrix.
     fn tensor_product(&self, rhs: impl Into<Rhs>) -> Self::Output;
 }
 
@@ -260,17 +317,36 @@ where
     }
 }
 
+/// An interface for braket operations.
+///
+/// A braket is a pair of a bra and a ket, denoted as ⟨ψ|ϕ⟩.
+/// The braket is a complex number that represents the inner product of two quantum states.
+/// The braket can be computed from the bra and ket using the formula ⟨ψ|ϕ⟩ = ψ†ϕ.
+///
+/// The outer product of a ket and a bra is called a ketbra, denoted as |ψ⟩⟨ϕ|.
+/// The ketbra is a matrix that represents the outer product of two quantum states.
+/// The ketbra can be computed from the bra and ket using the formula |ψ⟩⟨ϕ| = ψϕ†.
+///
+/// The braket and ketbra are useful for computing the probability of measuring a quantum state.
 pub trait Braket: Sized {
+    /// Returns the ket of the quantum state.
+    /// The ket is a column vector that represents the quantum state.
     fn ket(&self) -> DVector<Complex<f64>>;
 
+    /// Returns the bra of the quantum state.
+    /// The bra is a row vector that represents the conjugate transpose of the quantum state.
     fn bra(&self) -> OMatrix<Complex<f64>, U1, Dyn> {
         self.ket().transpose().conjugate()
     }
 
+    /// Returns the braket of the quantum state.
+    /// The braket is a complex number that represents the inner product of two quantum states.
     fn braket(&self) -> Complex<f64> {
         *(self.bra() * self.ket()).as_scalar()
     }
 
+    /// Returns the ketbra of the quantum state.
+    /// The ketbra is a matrix that represents the outer product of two quantum states.
     fn ketbra(&self) -> DMatrix<Complex<f64>> {
         self.ket() * self.bra()
     }

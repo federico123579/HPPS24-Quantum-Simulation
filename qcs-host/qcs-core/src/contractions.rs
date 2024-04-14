@@ -1,3 +1,13 @@
+//! This module contains the logic for contracting a tensor network.
+//! The tensor network is represented as a directed graph, where the nodes are tensors
+//! and the edges are tensor connections. The tensor connections are represented as spans.
+//!
+//! The contraction is done by contracting the tensors with the smallest rank first.
+//! The rank of a contraction is the length of the span that the contraction would cover.
+//!
+//! Not all arcs can be contracted, only the one that satisfy the following condition:
+//! The span of the source tensor and the target tensor is equal to the span of the arc.
+
 use hashbrown::{HashMap, HashSet};
 use petgraph::{
     stable_graph::{EdgeIndex, EdgeReference, StableDiGraph},
@@ -11,12 +21,15 @@ use crate::model::{
     QuantumCircuit,
 };
 
+/// A tensor network is a directed graph where the nodes are tensors and the
+/// edges are tensor connections.
 #[derive(Debug, Clone)]
 pub struct TensorNetwork {
     graph: StableDiGraph<TensorKind, Span>,
 }
 
 impl TensorNetwork {
+    /// Contract the tensor network and return the contracted tensors.
     pub fn contract(mut self) -> Vec<TensorKind> {
         println!("{}", self);
         loop {
@@ -55,6 +68,7 @@ impl TensorNetwork {
         self.graph.node_weights().cloned().collect()
     }
 
+    /// Find the edges that can be contracted.
     fn contractable(&self) -> Vec<EdgeReference<Span>> {
         self.graph
             .edge_references()
@@ -67,6 +81,7 @@ impl TensorNetwork {
             .collect()
     }
 
+    /// Contract an edge in the tensor network.
     fn contract_edge(&mut self, edge: EdgeIndex) {
         let (source, target) = self.graph.edge_endpoints(edge).unwrap();
 
@@ -110,6 +125,7 @@ impl TensorNetwork {
         }
     }
 
+    /// Calculate the rank of a contraction.
     pub fn contraction_rank(&self, edge: &EdgeReference<Span>) -> u8 {
         let source = self.graph.node_weight(edge.source()).unwrap();
         let target = self.graph.node_weight(edge.target()).unwrap();
@@ -143,13 +159,18 @@ impl std::fmt::Display for TensorNetwork {
     }
 }
 
+/// The kind of tensor in the tensor network.
+/// It can be a contraction or a gate.
 #[derive(Debug, Clone)]
 pub enum TensorKind {
+    /// A tensor contraction.
     Contraction(Box<TensorContraction>),
+    /// A single quantum gate.
     Gate(Box<Gate>),
 }
 
 impl TensorKind {
+    /// Get the span of the tensor.
     pub fn span(&self) -> Span {
         match self {
             Self::Contraction(c) => c.span.clone(),
@@ -179,15 +200,20 @@ impl std::fmt::Display for TensorKind {
     }
 }
 
+/// A tensor contraction is a contraction between two tensors.
+/// The rank of the contraction is the length of the span that the contraction would cover.
 #[derive(Debug, Clone)]
 pub struct TensorContraction {
     pub rank: u8,
     pub span: Span,
+    /// The left tensor in the contraction.
     pub lhs: TensorKind,
+    /// The right tensor in the contraction.
     pub rhs: TensorKind,
 }
 
 impl TensorContraction {
+    /// Create a new tensor contraction.
     pub fn new(left: TensorKind, right: TensorKind) -> Self {
         let span = left.span().full_join(&right.span());
         let rank = span.span_len() as u8;

@@ -2,20 +2,24 @@
 
 use std::{cmp::Ordering, iter::once, ops::Range};
 
-/// Span type for representing ranges of lanes in a gate.
+/// Span type for representing ranges of lanes in a gate. This is useful for
+/// representing the control and target lanes of a gate, or the lanes covered
+/// by a gate in a quantum circuit.
 ///
 /// Let's say we have a span covering (0,2), in a quantum circuit with 3 lanes
 /// this would represent for example a CNOT layout like this:
 ///
 /// ```ascii
 ///       ┌───┐
-/// ──────│ C │────── <--- lane 0 ┐ (control)
+/// ──────┤ C ├────── <--- lane 0 ┐ (control)
 ///       └─┬─┘                   │
-/// ────────│──────── <--- lane 1 │
+/// ────────┼──────── <--- lane 1 │
 ///       ┌─┴─┐                   │
-/// ──────│ X │────── <--- lane 2 ┘ (target)
+/// ──────┤ X ├────── <--- lane 2 ┘ (target)
 ///       └───┘
 /// ```
+///
+/// Impl. Note: The inner vector of span is always sorted in ascending order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span(Vec<usize>);
 
@@ -45,11 +49,13 @@ impl Span {
         self.0.len()
     }
 
+    /// Returns the minimum lane in the span
     #[inline]
     pub fn min(&self) -> usize {
         *self.0.first().unwrap()
     }
 
+    /// Returns the maximum lane in the span
     #[inline]
     pub fn max(&self) -> usize {
         *self.0.last().unwrap()
@@ -61,6 +67,14 @@ impl Span {
         self.0.contains(&value)
     }
 
+    /// Returns the full join of two spans.
+    /// ```
+    /// # use qcs_core::model::span::Span;
+    /// let a = Span::new([0, 1, 2, 3]);
+    /// let b = Span::new([2, 3, 4, 5]);
+    /// // The full join of A and B is [0, 1, 2, 3, 4, 5]
+    /// assert_eq!(a.full_join(&b), Span::new([0, 1, 2, 3, 4, 5]))
+    /// ```
     pub fn full_join(&self, other: &Self) -> Self {
         let mut self_iter = self.0.iter().peekable();
         let mut other_iter = other.0.iter().peekable();
@@ -93,6 +107,14 @@ impl Span {
         Self(result)
     }
 
+    /// Returns the inner join of two spans.
+    /// ```
+    /// # use qcs_core::model::span::Span;
+    /// let a = Span::new([0, 1, 2, 3]);
+    /// let b = Span::new([2, 3, 4, 5]);
+    /// // The inner join of A and B is [2, 3]
+    /// assert_eq!(a.inner_join(&b).unwrap(), Span::new([2, 3]))
+    /// ```
     pub fn inner_join(&self, other: &Self) -> Option<Self> {
         let mut self_iter = self.0.iter().peekable();
         let mut other_iter = other.0.iter().peekable();
@@ -121,6 +143,14 @@ impl Span {
     }
 
     /// Returns the spans that are not covered by the other span
+    ///
+    /// ```
+    /// # use qcs_core::model::span::Span;
+    /// let a = Span::new([0, 1, 2, 3]);
+    /// let b = Span::new([2, 3, 4, 5]);
+    /// // The exclusion of A and B is [0, 1]
+    /// assert_eq!(a.exclude(&b).unwrap(), Span::new([0, 1]))
+    /// ```
     pub fn exclude(self, other: &Self) -> Option<Self> {
         let self_iter = self.0.into_iter();
         let mut result = Vec::new();
@@ -167,16 +197,40 @@ impl From<usize> for Span {
     }
 }
 
+/// A SpanRegister is like a sliding vertical view that walks over a quantum
+/// circuit and keeps track of the spans that are covered by gates.
+/// Every time a gate is applied to the circuit, the register is updated with
+/// the span of lanes that the gate covers.
+///
+/// ```
+/// # use qcs_core::model::span::{Span, SpanRegister};
+/// let mut reg = SpanRegister::new();
+///
+/// reg.apply(Span::range(0..5), 1);
+/// // This will override the value 1 in the span [1] with the value 2
+/// reg.apply(Span::range(1..2), 2);
+/// // This will override the value 1 in the span [0] with the value 3
+/// reg.apply(Span::range(0..1), 3);
+///
+/// let res = reg.get(&Span::range(1..3));
+///
+/// assert_eq!(res.len(), 2);
+/// // The span [1] is covered by the value 2
+/// assert!(res.contains(&(Span::range(1..2), 2)));
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct SpanRegister<T: Clone> {
     spans: Vec<(Span, T)>,
 }
 
 impl<T: Clone> SpanRegister<T> {
+    /// Creates an empty SpanRegister
     pub fn new() -> Self {
         SpanRegister { spans: Vec::new() }
     }
 
+    /// Applies value to span in span register, overwriting all portions of other
+    /// spans that are covered by the new span.
     pub fn apply(&mut self, span: Span, value: T) {
         let span_c = span.clone();
         self.spans = self
@@ -188,6 +242,7 @@ impl<T: Clone> SpanRegister<T> {
             .collect();
     }
 
+    /// Returns the spans and the values associated with the given span
     pub fn get(&self, span: &Span) -> Vec<(Span, T)> {
         self.spans
             .iter()
@@ -200,6 +255,7 @@ impl<T: Clone> SpanRegister<T> {
 mod tests {
     use super::*;
 
+    /// Test if the SpanRegister works as expected
     #[test]
     fn test_span_register() {
         use super::SpanRegister;

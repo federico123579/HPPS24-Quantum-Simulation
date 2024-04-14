@@ -1,3 +1,10 @@
+//! This module contains all the abstractions and structures related to quantum
+//! gates.
+//!
+//! A quantum gate is a unitary operator that acts on a quantum state, that is a
+//! matrix with norm 1. The gates are represented as matrices of complex
+//! numbers, and are used to perform operations on qubits.
+
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use enum_dispatch::enum_dispatch;
@@ -5,6 +12,16 @@ use nalgebra::{Complex, DMatrix};
 
 use super::{blocks::SpannedBlock, span::Span, Block, Braket, Qubit, TensorProduct};
 
+/// An interface for quantum gates. Each gate has a matrix representation, a
+/// rank, a span, and a block representation.
+///
+/// The rank of a gate is the number of qubits the gate acts on. For example, a
+/// rank 1 gate is a single qubit gate, a rank 2 gate is a two qubit gate, etc.
+///
+/// The span of a gate is the set of qubits the gate acts on.
+///
+/// The block representation of a gate is a decorated matrix representation of
+/// the gate with some utility functions.
 #[enum_dispatch]
 pub trait QuantumGate {
     /// Return the matrix representation of the gate
@@ -28,23 +45,36 @@ pub trait QuantumGate {
     }
 }
 
+/// This represents all available quantum gates in the system.
 #[enum_dispatch(QuantumGate)]
 #[derive(Debug, Clone, Copy)]
 pub enum Gate {
+    /// The identity gate, which does nothing to the qubit.
     Identity,
+    /// The Pauli X gate, which flips the qubit.
     PauliX,
+    /// The Pauli Y gate, which flips the qubit and adds a phase.
     PauliY,
+    /// The Pauli Z gate, which adds a phase to the qubit.
     PauliZ,
+    /// The Hadamard gate, which puts the qubit in a superposition.
     Hadamard,
+    /// The phase gate, which adds a phase to the qubit.
     Phase,
+    /// The controlled X gate, which flips the target qubit if the control qubit is 1.
     CX,
+    /// The controlled Y gate, which flips the target qubit if the control qubit is 1.
     CY,
+    /// The controlled Z gate, which adds a phase to the target qubit if the control qubit is 1.
     CZ,
+    /// The swap gate, which swaps the states of two qubits.
     Swap,
+    /// The Toffoli gate, which flips the target qubit if both control qubits are 1.
     Toffoli,
 }
 
 impl Gate {
+    /// Return true if the gate is a rank one gate.
     pub fn is_rank_one(&self) -> bool {
         match self {
             Gate::Identity(_)
@@ -76,12 +106,34 @@ impl std::fmt::Display for Gate {
     }
 }
 
+/// The Identity gate, which does nothing to the qubit.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌     ┐
+/// │ 1 0 │
+/// │ 0 1 │
+/// └     ┘
+/// ```
+///
+///
+/// In a quantum circuit this can be represented by either a single line
+/// ```text
+/// ───────────
+/// ```
+/// or by the gate `I`
+/// ```text
+///    ┌───┐
+/// ───┤ I ├───
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Identity {
     lane: usize,
 }
 
 impl Identity {
+    /// Create a new Identity gate acting on the given lane.
     pub fn new(lane: usize) -> Self {
         Self { lane }
     }
@@ -101,12 +153,29 @@ impl QuantumGate for Identity {
     }
 }
 
+/// The Pauli X gate, which flips the qubit.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌     ┐
+/// │ 0 1 │
+/// │ 1 0 │
+/// └     ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `X`
+/// ```text
+///    ┌───┐
+/// ───┤ X ├───
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct PauliX {
     lane: usize,
 }
 
 impl PauliX {
+    /// Create a new Pauli X gate acting on the given lane.
     pub fn new(lane: usize) -> Self {
         Self { lane }
     }
@@ -126,12 +195,29 @@ impl QuantumGate for PauliX {
     }
 }
 
+/// The Pauli Y gate, which flips the qubit and adds a phase.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌      ┐
+/// │ 0 -i │
+/// │ i  0 │
+/// └      ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `Y`
+/// ```text
+///    ┌───┐
+/// ───┤ Y ├───
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct PauliY {
     lane: usize,
 }
 
 impl PauliY {
+    /// Create a new Pauli Y gate acting on the given lane.
     pub fn new(lane: usize) -> Self {
         Self { lane }
     }
@@ -151,12 +237,29 @@ impl QuantumGate for PauliY {
     }
 }
 
+/// The Pauli Z gate, which adds a phase to the qubit.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌      ┐
+/// │ 1  0 │
+/// │ 0 -1 │
+/// └      ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `Z`
+/// ```text
+///    ┌───┐
+/// ───┤ Z ├───
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct PauliZ {
     lane: usize,
 }
 
 impl PauliZ {
+    /// Create a new Pauli Z gate acting on the given lane.
     pub fn new(lane: usize) -> Self {
         Self { lane }
     }
@@ -176,6 +279,22 @@ impl QuantumGate for PauliZ {
     }
 }
 
+/// The Hadamard gate, which puts the qubit in a superposition.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌            ┐
+/// │ 1/√2  1/√2 │
+/// │ 1/√2 -1/√2 │
+/// └            ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `H`
+/// ```text
+///    ┌───┐
+/// ───┤ H ├───
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Hadamard {
     lane: usize,
@@ -202,6 +321,23 @@ impl QuantumGate for Hadamard {
     }
 }
 
+/// The phase gate, which adds a phase to the qubit.
+/// This gate can accept any phase value.
+///
+/// It is represented by the matrix (where φ is the phase):
+/// ```text
+/// ┌        ┐
+/// │ 1   0  │
+/// │ 0 e^iφ │
+/// └        ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `P(φ)`
+/// ```text
+///    ┌──────┐
+/// ───┤ P(φ) ├───
+///    └──────┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Phase {
     pub phase: f64,
@@ -240,6 +376,26 @@ impl QuantumGate for Phase {
     }
 }
 
+/// The controlled X gate, which flips the target qubit if the control qubit is 1.
+/// This gate acts on two qubits, the control and the target.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌         ┐
+/// │ 1 0 0 0 │
+/// │ 0 1 0 0 │
+/// │ 0 0 0 1 │
+/// │ 0 0 1 0 │
+/// └         ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `CX`
+/// ```ascii
+/// ─────@─────  (control)
+///    ┌─┴─┐
+/// ───┤ X ├─── (target)
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct CX {
     control: usize,
@@ -247,6 +403,7 @@ pub struct CX {
 }
 
 impl CX {
+    /// Create a new controlled X gate with the given control and target qubits.
     pub fn new(control: usize, target: usize) -> Self {
         assert_ne!(control, target, "Control and target must be different");
         Self { control, target }
@@ -267,6 +424,26 @@ impl QuantumGate for CX {
     }
 }
 
+/// The controlled Y gate, which flips the target qubit if the control qubit is 1.
+/// This gate acts on two qubits, the control and the target.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌            ┐
+/// │ 1  0  0  0 │
+/// │ 0  1  0  0 │
+/// │ 0  0  0 -i │
+/// │ 0  0  i  0 │
+/// └            ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `CY`
+/// ```ascii
+/// ─────@─────  (control)
+///    ┌─┴─┐
+/// ───┤ Y ├───  (target)
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct CY {
     control: usize,
@@ -274,6 +451,7 @@ pub struct CY {
 }
 
 impl CY {
+    /// Create a new controlled Y gate with the given control and target qubits.
     pub fn new(control: usize, target: usize) -> Self {
         Self { control, target }
     }
@@ -293,6 +471,26 @@ impl QuantumGate for CY {
     }
 }
 
+/// The controlled Z gate, which adds a phase to the target qubit if the control qubit is 1.
+/// This gate acts on two qubits, the control and the target.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌             ┐
+/// │ 1  0  0  0  │
+/// │ 0  1  0  0  │
+/// │ 0  0  1  0  │
+/// │ 0  0  0 -1  │
+/// └             ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `CZ`
+/// ```ascii
+/// ─────@─────  (control)
+///    ┌─┴─┐
+/// ───┤ Z ├───  (target)
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct CZ {
     control: usize,
@@ -300,6 +498,7 @@ pub struct CZ {
 }
 
 impl CZ {
+    /// Create a new controlled Z gate with the given control and target qubits.
     pub fn new(control: usize, target: usize) -> Self {
         Self { control, target }
     }
@@ -319,12 +518,32 @@ impl QuantumGate for CZ {
     }
 }
 
+/// The swap gate, which swaps the states of two qubits.
+/// This gate acts on two qubits.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌         ┐
+/// │ 1 0 0 0 │
+/// │ 0 0 1 0 │
+/// │ 0 1 0 0 │
+/// │ 0 0 0 1 │
+/// └         ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `SWAP`
+/// ```ascii
+/// ─────X─────
+///      │
+/// ─────X─────
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Swap {
     lanes: (usize, usize),
 }
 
 impl Swap {
+    /// Create a new swap gate with the given control and target qubits.
     pub fn new(lane1: usize, lane2: usize) -> Self {
         Self {
             lanes: (lane1, lane2),
@@ -363,6 +582,33 @@ impl QuantumGate for Swap {
     }
 }
 
+/// The Toffoli gate, which flips the target qubit if both control qubits are 1.
+/// This gate acts on three qubits, two control qubits and one target qubit.
+/// It is also known as the CCX gate.
+///
+/// It is represented by the matrix:
+/// ```text
+/// ┌                 ┐
+/// │ 1 0 0 0 0 0 0 0 │
+/// │ 0 1 0 0 0 0 0 0 │
+/// │ 0 0 1 0 0 0 0 0 │
+/// │ 0 0 0 1 0 0 0 0 │
+/// │ 0 0 0 0 1 0 0 0 │
+/// │ 0 0 0 0 0 1 0 0 │
+/// │ 0 0 0 0 0 0 0 1 │
+/// │ 0 0 0 0 0 0 1 0 │
+/// └                 ┘
+/// ```
+///
+/// In a quantum circuit this can be represented by the gate `CCX`
+/// ```ascii
+/// ─────@───── (control 1)
+///      │
+/// ─────@───── (control 2)
+///    ┌─┴─┐
+/// ───┤ X ├─── (target)
+///    └───┘
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Toffoli {
     control: (usize, usize),
@@ -370,6 +616,7 @@ pub struct Toffoli {
 }
 
 impl Toffoli {
+    /// Create a new Toffoli gate with the given control and target qubits.
     pub fn new(control: (usize, usize), target: usize) -> Self {
         Self { control, target }
     }

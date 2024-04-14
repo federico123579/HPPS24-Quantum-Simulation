@@ -1,3 +1,11 @@
+//! Module containing the definition of the `Block` and `SpannedBlock` structs.
+//!
+//! The `Block` struct is a wrapper around a `DMatrix<Complex<f64>>` and provides
+//! methods for tensor product and matrix multiplication.
+//! The `SpannedBlock` struct is a wrapper around a `Block` and a `Span`, and provides
+//! methods for tensor product and matrix multiplication, while keeping track of
+//! the span of the block.
+
 use std::ops::Mul;
 
 use nalgebra::{Complex, DMatrix};
@@ -6,88 +14,8 @@ use crate::model::{gates::*, span::Span};
 
 use super::{QRegister, TensorProduct};
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpannedBlock {
-    block: Block,
-    span: Span,
-}
-
-impl SpannedBlock {
-    pub fn new(block: Block, span: Span) -> Self {
-        Self { block, span }
-    }
-
-    pub fn merged_span(&self, rhs: &SpannedBlock) -> Span {
-        self.span.full_join(&rhs.span)
-    }
-
-    pub fn adapt_to_span(mut self, span: Span) -> Self {
-        let mut new_block = Block::one();
-        for i in span.min()..self.span.min() {
-            new_block = new_block.tensor_product(Identity::new(i));
-        }
-        new_block = new_block.tensor_product(self.block);
-        for i in (self.span.max() + 1)..(span.max() + 1) {
-            new_block = new_block.tensor_product(Identity::new(i));
-        }
-        self.block = new_block;
-        self.span = span;
-        self
-    }
-
-    pub fn into_block(self) -> Block {
-        self.block
-    }
-}
-
-impl std::fmt::Display for SpannedBlock {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SpannedBlock{}:\n{}", self.span, self.block)
-    }
-}
-
-impl From<Gate> for SpannedBlock {
-    fn from(gate: Gate) -> Self {
-        gate.spanned_block()
-    }
-}
-
-impl TensorProduct for SpannedBlock {
-    type Output = SpannedBlock;
-
-    fn tensor_product(&self, rhs: impl Into<SpannedBlock>) -> Self::Output {
-        let rhs = rhs.into();
-        SpannedBlock {
-            block: self.block.tensor_product(rhs.block),
-            span: self.span.full_join(&rhs.span),
-        }
-    }
-}
-
-impl Mul<&SpannedBlock> for &SpannedBlock {
-    type Output = SpannedBlock;
-
-    fn mul(self, rhs: &SpannedBlock) -> Self::Output {
-        assert_eq!(self.span, rhs.span, "Incompatible spans");
-        SpannedBlock {
-            block: &self.block * &rhs.block,
-            span: self.span.full_join(&rhs.span),
-        }
-    }
-}
-
-impl Mul<SpannedBlock> for SpannedBlock {
-    type Output = SpannedBlock;
-
-    fn mul(self, rhs: SpannedBlock) -> Self::Output {
-        assert_eq!(self.span, rhs.span, "Incompatible spans");
-        SpannedBlock {
-            block: &self.block * &rhs.block,
-            span: self.span.full_join(&rhs.span),
-        }
-    }
-}
-
+/// A Block is a wrapper around a `DMatrix<Complex<f64>>` and provides methods for
+/// tensor product and matrix multiplication.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     matrix_repr: DMatrix<Complex<f64>>,
@@ -95,20 +23,24 @@ pub struct Block {
 }
 
 impl Block {
+    /// Creates a new Block from a `DMatrix<Complex<f64>>` full of zeros.
     pub fn empty(dim: usize) -> Self {
         DMatrix::from_element(dim, dim, Complex::new(0.0, 0.0)).into()
     }
 
+    /// Create a block of dimension 1x1 with value 1.
     pub fn one() -> Self {
         DMatrix::from_row_slice(1, 1, &[1.0])
             .map(|x| Complex::new(x, 0.0))
             .into()
     }
 
+    /// Create a block of identity matrix of dimension dim.
     pub fn identity(dim: usize) -> Self {
         DMatrix::identity(dim, dim).into()
     }
 
+    /// Convert the Block into a `DMatrix<Complex<f64>>`.
     pub fn into_matrix(self) -> DMatrix<Complex<f64>> {
         self.matrix_repr
     }
@@ -240,5 +172,94 @@ impl std::ops::Sub for Block {
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.matrix_repr)
+    }
+}
+
+/// A `SpannedBlock` is a wrapper around a `Block` and a `Span`, and provides methods for
+/// tensor product and matrix multiplication, while keeping track of the span of the block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpannedBlock {
+    block: Block,
+    span: Span,
+}
+
+impl SpannedBlock {
+    /// Creates a new SpannedBlock from a `Block` and a `Span`.
+    pub fn new(block: Block, span: Span) -> Self {
+        Self { block, span }
+    }
+
+    /// Returns the span that a contraction with another `SpannedBlock` would cover.
+    pub fn merged_span(&self, rhs: &SpannedBlock) -> Span {
+        self.span.full_join(&rhs.span)
+    }
+
+    /// Adapts the span of the block to a new span, making tensor products
+    /// in the right order.
+    pub fn adapt_to_span(mut self, span: Span) -> Self {
+        let mut new_block = Block::one();
+        for i in span.min()..self.span.min() {
+            new_block = new_block.tensor_product(Identity::new(i));
+        }
+        new_block = new_block.tensor_product(self.block);
+        for i in (self.span.max() + 1)..(span.max() + 1) {
+            new_block = new_block.tensor_product(Identity::new(i));
+        }
+        self.block = new_block;
+        self.span = span;
+        self
+    }
+
+    /// Return the inner block.
+    pub fn into_block(self) -> Block {
+        self.block
+    }
+}
+
+impl std::fmt::Display for SpannedBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SpannedBlock{}:\n{}", self.span, self.block)
+    }
+}
+
+impl From<Gate> for SpannedBlock {
+    fn from(gate: Gate) -> Self {
+        gate.spanned_block()
+    }
+}
+
+impl TensorProduct for SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn tensor_product(&self, rhs: impl Into<SpannedBlock>) -> Self::Output {
+        let rhs = rhs.into();
+        SpannedBlock {
+            block: self.block.tensor_product(rhs.block),
+            span: self.span.full_join(&rhs.span),
+        }
+    }
+}
+
+impl Mul<&SpannedBlock> for &SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn mul(self, rhs: &SpannedBlock) -> Self::Output {
+        assert_eq!(self.span, rhs.span, "Incompatible spans");
+        SpannedBlock {
+            block: &self.block * &rhs.block,
+            span: self.span.full_join(&rhs.span),
+        }
+    }
+}
+
+impl Mul<SpannedBlock> for SpannedBlock {
+    type Output = SpannedBlock;
+
+    fn mul(self, rhs: SpannedBlock) -> Self::Output {
+        assert_eq!(self.span, rhs.span, "Incompatible spans");
+        SpannedBlock {
+            block: &self.block * &rhs.block,
+            span: self.span.full_join(&rhs.span),
+        }
     }
 }
