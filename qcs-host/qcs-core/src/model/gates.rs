@@ -389,7 +389,7 @@ impl QuantumGate for Toffoli {
         let start = lanes.iter().min().unwrap();
         let end = lanes.iter().max().unwrap();
 
-        let mut res = Block::empty(8).into_matrix();
+        let mut res = Block::empty(2_usize.pow((end - start + 1) as u32)).into_matrix();
 
         // case control <- 0* || *0
         let cases = [
