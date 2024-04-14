@@ -1,2 +1,13 @@
-default:
-    cargo r
+alias b := build
+alias c := clean
+alias t := test
+
+build:
+    cargo build --release
+    mv target/release/qcs-bins qcs
+
+clean:
+    rm -i ./qcs
+
+test:
+    cargo nextest run
