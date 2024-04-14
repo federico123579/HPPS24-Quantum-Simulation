@@ -13,7 +13,7 @@ pub struct SpannedBlock {
 }
 
 impl SpannedBlock {
-    fn new(block: Block, span: Span) -> Self {
+    pub fn new(block: Block, span: Span) -> Self {
         Self { block, span }
     }
 
@@ -48,7 +48,7 @@ impl std::fmt::Display for SpannedBlock {
 
 impl From<Gate> for SpannedBlock {
     fn from(gate: Gate) -> Self {
-        Self::new(gate.block(), gate.span())
+        gate.spanned_block()
     }
 }
 

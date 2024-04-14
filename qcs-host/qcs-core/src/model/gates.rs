@@ -3,7 +3,7 @@ use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
 use enum_dispatch::enum_dispatch;
 use nalgebra::{Complex, DMatrix};
 
-use super::{span::Span, Block, Braket, Qubit, TensorProduct};
+use super::{blocks::SpannedBlock, span::Span, Block, Braket, Qubit, TensorProduct};
 
 #[enum_dispatch]
 pub trait QuantumGate {
@@ -20,6 +20,11 @@ pub trait QuantumGate {
     /// Return the equivalent block representation of the gate
     fn block(&self) -> Block {
         self.matrix().into()
+    }
+
+    /// Return spanned block representation of the gate
+    fn spanned_block(&self) -> SpannedBlock {
+        SpannedBlock::new(self.block(), self.span())
     }
 }
 
