@@ -195,6 +195,16 @@ impl Mul<&Block> for Block {
     }
 }
 
+impl<Q: Into<QRegister>> Mul<Q> for &Block {
+    type Output = QRegister;
+
+    fn mul(self, rhs: Q) -> Self::Output {
+        QRegister {
+            qubits: self.as_ref() * rhs.into().qubits,
+        }
+    }
+}
+
 impl<Q: Into<QRegister>> Mul<Q> for Block {
     type Output = QRegister;
 
