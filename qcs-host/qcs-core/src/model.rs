@@ -320,27 +320,47 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn inverted_cnot() {
-    //     let mut circ = QuantumCircuit::new(2);
-    //     circ.g_h(0);
-    //     circ.g_h(1);
-    //     circ.g_cxu(0..2);
-    //     circ.g_h(0);
-    //     circ.g_h(1);
+    #[test]
+    fn inverted_cnot() {
+        let mut circ = QuantumCircuit::new(2);
+        circ.g_h(0);
+        circ.g_h(1);
+        circ.g_cx(0, 1);
+        circ.g_h(0);
+        circ.g_h(1);
 
-    //     let t_eval = circ.eval();
-    //     println!("Circuit eval: {}", t_eval);
+        let t_eval = circ.eval().into_matrix();
+        let cx_inverted = CX::new(1, 0).block().into_matrix();
 
-    //     let cnot_inverted = CNOTdown.block();
-    //     // println!("{}", cnot_inverted);
+        assert!((t_eval - cx_inverted).norm() < 1e-10);
+    }
 
-    //     for i in 0..4 {
-    //         for j in 0..4 {
-    //             assert!(
-    //                 (t_eval.matrix_repr[(i, j)] - cnot_inverted.matrix_repr[(i, j)]).norm() < 1e-10
-    //             );
-    //         }
-    //     }
-    // }
+    #[test]
+    fn not_ajacent_cnot() {
+        let mut circ = QuantumCircuit::new(3);
+        circ.g_h(0);
+        circ.g_h(2);
+        circ.g_cx(0, 2);
+        circ.g_h(0);
+        circ.g_h(2);
+
+        let t_eval = circ.eval().into_matrix();
+        let cx_inverted = CX::new(2, 0).block().into_matrix();
+
+        assert!((t_eval - cx_inverted).norm() < 1e-10);
+    }
+
+    #[test]
+    fn swap() {
+        let mut circ = QuantumCircuit::new(2);
+        circ.g_swap(0, 1);
+        circ.g_swap(1, 0);
+        circ.g_swap(0, 1);
+        circ.g_swap(0, 1);
+
+        let t_eval = circ.eval().into_matrix();
+        let id = Block::identity(4).into_matrix();
+
+        assert!((t_eval - id).norm() < 1e-10);
+    }
 }
