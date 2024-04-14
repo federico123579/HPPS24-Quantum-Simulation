@@ -43,7 +43,6 @@ fn main() {
     }
 
     let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
-    let inr = QRegister::from([Qubit::one(), Qubit::zero(), Qubit::zero(), Qubit::zero()]);
     let start = std::time::Instant::now();
     let circ_eval = circuit.clone().eval();
     let qstate_1 = circ_eval * inr.clone();
