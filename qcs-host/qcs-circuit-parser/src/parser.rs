@@ -5,12 +5,12 @@ use nom::InputLength;
 use qcs_core::model::gates::*;
 
 use crate::{
-    error::{Error, ErrorKind},
+    error::{ErrorKind, ParserError},
     tokens::Token,
 };
 
 #[derive(Debug, Clone)]
-pub struct Parser<'s>(Lexer<'s, Token>);
+pub struct Parser<'s>(pub Lexer<'s, Token>);
 
 impl<'s> Deref for Parser<'s> {
     type Target = Lexer<'s, Token>;
@@ -38,7 +38,7 @@ impl InputLength for Parser<'_> {
     }
 }
 
-pub type IResult<'s, T> = nom::IResult<Parser<'s>, T, Error<'s>>;
+pub type IResult<'s, T> = nom::IResult<Parser<'s>, T, ParserError<'s>>;
 
 pub fn parse_gate(input: Parser<'_>) -> IResult<Gate> {
     let (input, token) = expect_next(input)?;
@@ -103,12 +103,12 @@ fn parse_lanes(input: Parser<'_>) -> IResult<Vec<usize>> {
 fn expect_next(mut input: Parser<'_>) -> IResult<Token> {
     match input.next() {
         Some(Ok(token)) => Ok((input, token)),
-        Some(Err(_)) => Err(nom::Err::Failure(Error {
+        Some(Err(_)) => Err(nom::Err::Failure(ParserError {
             span: input.span(),
             input,
             kind: ErrorKind::InvalidToken,
         })),
-        None => Err(nom::Err::Error(Error {
+        None => Err(nom::Err::Error(ParserError {
             span: input.span(),
             input,
             kind: ErrorKind::UnexpectedEoF,
@@ -117,8 +117,8 @@ fn expect_next(mut input: Parser<'_>) -> IResult<Token> {
 }
 
 #[inline]
-fn unexpected(input: Parser<'_>) -> nom::Err<Error> {
-    nom::Err::Failure(Error {
+fn unexpected(input: Parser<'_>) -> nom::Err<ParserError> {
+    nom::Err::Failure(ParserError {
         span: input.span(),
         input,
         kind: ErrorKind::UnexpectedToken,

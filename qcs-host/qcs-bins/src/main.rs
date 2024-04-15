@@ -16,8 +16,7 @@ struct Cli {
 
 fn main() {
     let args = Cli::parse();
-    let input_txt = std::fs::read_to_string(args.input).unwrap();
-    let circuit = parse_program(&input_txt).unwrap();
+    let circuit = parse_program(args.input).unwrap();
 
     let tensor_net = TensorNetwork::from(circuit.clone());
     let mut contracted_nodes = tensor_net.contract().into_iter();

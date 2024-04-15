@@ -1,31 +1,46 @@
-use std::error::Error as StdError;
+use std::ops::Range;
 
 use nom::error::ParseError;
+use thiserror::Error;
 
 use crate::parser::Parser;
 
-#[derive(Debug)]
-pub struct Error<'s> {
-    pub input: Parser<'s>,
-    pub span: std::ops::Range<usize>,
-    pub kind: ErrorKind,
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Text parser error: {0}")]
+    TextParserError(#[from] OwnedParserError),
+    #[error("Unsupported file extension")]
+    UnsupportedFileExtension,
 }
 
-impl StdError for Error<'_> {}
+#[derive(Debug, Error)]
+#[error("{kind}\n in \"{text}\"")]
+pub struct OwnedParserError {
+    pub kind: ErrorKind,
+    pub input: String,
+    pub text: String,
+}
 
-impl std::fmt::Display for Error<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{kind} at {span:?}: {input:?}",
-            kind = self.kind,
-            span = self.span,
-            input = self.input
-        )
+impl From<ParserError<'_>> for OwnedParserError {
+    fn from(err: ParserError) -> Self {
+        let source = err.input.0.source().to_string();
+        Self {
+            kind: err.kind,
+            text: source[err.span].to_string(),
+            input: source,
+        }
     }
 }
 
-impl<'s> ParseError<Parser<'s>> for Error<'s> {
+#[derive(Debug, Error)]
+#[error("{kind} at {span:?}: {input:?}")]
+pub struct ParserError<'s> {
+    pub input: Parser<'s>,
+    pub span: Range<usize>,
+    pub kind: ErrorKind,
+}
+
+impl<'s> ParseError<Parser<'s>> for ParserError<'s> {
     fn from_error_kind(input: Parser<'s>, kind: nom::error::ErrorKind) -> Self {
         Self {
             span: input.span(),

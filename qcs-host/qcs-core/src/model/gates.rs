@@ -96,7 +96,7 @@ impl std::fmt::Display for Gate {
             Gate::PauliY(y) => write!(f, "Y[{}]", y.lane),
             Gate::PauliZ(z) => write!(f, "Z[{}]", z.lane),
             Gate::Hadamard(h) => write!(f, "H[{}]", h.lane),
-            Gate::Phase(p) => write!(f, "P({})[{}]", p.phase, p.lane),
+            Gate::Phase(p) => write!(f, "P({:.2})[{}]", p.phase, p.lane),
             Gate::CX(cx) => write!(f, "CX[{},{}]", cx.control, cx.target),
             Gate::CY(cy) => write!(f, "CY[{},{}]", cy.control, cy.target),
             Gate::CZ(cz) => write!(f, "CZ[{},{}]", cz.control, cz.target),

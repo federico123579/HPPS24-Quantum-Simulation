@@ -204,6 +204,12 @@ impl QuantumCircuit {
         self.gates.push(Phase::new(phase, qix).into());
     }
 
+    /// Adds the S gate to the circuit.
+    pub fn g_s(&mut self, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(Phase::s(qix).into());
+    }
+
     /// Adds the T gate to the circuit.
     pub fn g_t(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);

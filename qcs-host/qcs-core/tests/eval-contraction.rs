@@ -13,9 +13,7 @@ macro_rules! test_circuit {
     ($name:ident, $filename:expr) => {
         #[test]
         fn $name() -> Result<()> {
-            let circ_cont =
-                load_circuit_content($filename).context("Failed to load circuit content")?;
-            let circ = parse_program(&circ_cont).unwrap();
+            let circ = parse_program(circuit_dir()?.join($filename)).unwrap();
             check(&circ, &zero_register(circ.n_qubits))
                 .context("Failed to check for zero register")?;
             check(&circ, &one_register(circ.n_qubits))
@@ -96,10 +94,6 @@ fn contract(circuit: &QuantumCircuit) -> Result<Block> {
 
     eval.map(|sb| sb.into_block())
         .ok_or(anyhow::anyhow!("Nothing to contract"))
-}
-
-fn load_circuit_content(filename: &str) -> Result<String> {
-    Ok(std::fs::read_to_string(circuit_dir()?.join(filename))?)
 }
 
 fn circuit_dir() -> Result<PathBuf> {
