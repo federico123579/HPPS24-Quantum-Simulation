@@ -19,6 +19,7 @@ defusedxml==0.7.1
 dill==0.3.8
 executing==2.0.1
 fastjsonschema==2.19.1
+fire==0.6.0
 fqdn==1.5.1
 h11==0.14.0
 httpcore==1.0.5
@@ -86,6 +87,7 @@ stack-data==0.6.3
 stevedore==5.2.0
 symengine==0.11.0
 sympy==1.12
+termcolor==2.4.0
 terminado==0.18.1
 tinycss2==1.2.1
 tornado==6.4
