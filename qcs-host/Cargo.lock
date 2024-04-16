@@ -668,6 +668,7 @@ dependencies = [
 name = "qcs-circuit-parser"
 version = "0.1.0"
 dependencies = [
+ "hashbrown 0.14.3",
  "logos",
  "nom",
  "oq3_semantics",
