@@ -11,6 +11,7 @@ hashbrown = "0.14.3"
 nalgebra = "0.32.5"
 num-complex = "0.4.5"
 petgraph = "0.6.4"
+rayon = "1.10.0"
 
 [dev-dependencies]
 anyhow = "1.0.82"

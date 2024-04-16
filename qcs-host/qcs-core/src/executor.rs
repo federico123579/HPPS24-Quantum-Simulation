@@ -4,7 +4,10 @@
 //! As for now there is only one executor, the `CpuExecutor`, which is responsible for
 //! executing the instructions on the CPU.
 
+use std::sync::{Arc, Mutex};
+
 use hashbrown::HashMap;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     model::blocks::SpannedBlock,
@@ -15,34 +18,36 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct CpuExecutor {
     /// The memory of the executor, which is a map from the id of the block to the block itself.
-    memory: HashMap<usize, SpannedBlock>,
+    memory: Arc<Mutex<HashMap<usize, SpannedBlock>>>,
 }
 
 impl CpuExecutor {
     /// Creates a new `CpuExecutor`.
     pub fn new() -> Self {
         Self {
-            memory: HashMap::new(),
+            memory: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     /// Loads a block from memory or from the instruction.
     #[inline]
-    fn load_block(&mut self, instruction: InstructionOperand) -> SpannedBlock {
+    fn load_block(&self, instruction: InstructionOperand) -> SpannedBlock {
         match instruction {
             InstructionOperand::Gate(gate) => gate.into(),
-            InstructionOperand::Address(address) => self.memory.remove(&address).unwrap(),
+            InstructionOperand::Address(address) => {
+                self.memory.lock().unwrap().remove(&address).unwrap()
+            }
         }
     }
 
     /// Saves a block in memory.
     #[inline]
-    fn save_block(&mut self, id: usize, block: SpannedBlock) {
-        self.memory.insert(id, block);
+    fn save_block(&self, id: usize, block: SpannedBlock) {
+        self.memory.lock().unwrap().insert(id, block);
     }
 
     /// Executes a single instruction, updating the memory meanwhile.
-    fn execute_single(&mut self, instruction: Instruction) {
+    fn execute_single(&self, instruction: Instruction) {
         let Instruction {
             id, first, second, ..
         } = instruction;
@@ -61,9 +66,15 @@ impl CpuExecutor {
     /// Executes a list of instructions, returning the equivalent blocks after
     /// conducting all the operations.
     pub fn execute(&mut self, instructions: Vec<Instruction>) -> Vec<SpannedBlock> {
-        for instruction in instructions {
+        // Parallel execution of all indipendent instructions.
+        instructions.into_par_iter().for_each(|instruction| {
             self.execute_single(instruction);
-        }
-        self.memory.drain().map(|(_, block)| block).collect()
+        });
+        self.memory
+            .lock()
+            .unwrap()
+            .drain()
+            .map(|(_, block)| block)
+            .collect()
     }
 }
