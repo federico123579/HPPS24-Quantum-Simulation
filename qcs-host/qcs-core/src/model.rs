@@ -10,7 +10,7 @@ pub mod span;
 
 use nalgebra::{
     allocator::Allocator, Complex, DMatrix, DVector, DefaultAllocator, Dim, DimMul, DimProd, Dyn,
-    Matrix, OMatrix, Storage, VecStorage, Vector2, U1,
+    Matrix, OMatrix, Storage, VecStorage, Vector2,
 };
 
 use crate::model::gates::*;
@@ -213,10 +213,46 @@ impl QuantumCircuit {
     /// Adds the T gate to the circuit.
     pub fn g_t(&mut self, qix: usize) {
         assert!(qix < self.n_qubits);
-        self.gates.push(Phase::pi8(qix).into());
+        self.gates.push(Phase::t(qix).into());
     }
 
-    /// Adds the S gate to the circuit.
+    /// Adds the inverse of S
+    pub fn g_s_dg(&mut self, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(Phase::s_inv(qix).into());
+    }
+
+    /// Adds the inverse of T
+    pub fn g_t_dg(&mut self, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(Phase::t_inv(qix).into());
+    }
+
+    /// Adds the sqrt(NOT) gate to the circuit.
+    pub fn g_sx(&mut self, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(SX::new(qix).into());
+    }
+
+    /// Adds the RX gate to the circuit.
+    pub fn g_rx(&mut self, angle: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(RX::new(angle, qix).into());
+    }
+
+    /// Adds the RY gate to the circuit.
+    pub fn g_ry(&mut self, angle: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(RY::new(angle, qix).into());
+    }
+
+    /// Adds the RZ gate to the circuit.
+    pub fn g_rz(&mut self, angle: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(RZ::new(angle, qix).into());
+    }
+
+    /// Adds the CX gate to the circuit.
     pub fn g_cx(&mut self, qix_control: usize, qix_target: usize) {
         assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
         self.gates.push(CX::new(qix_control, qix_target).into());
@@ -234,6 +270,40 @@ impl QuantumCircuit {
         self.gates.push(CZ::new(qix_control, qix_target).into());
     }
 
+    /// Adds the CP gate to the circuit.
+    pub fn g_cp(&mut self, phase: f64, qix_control: usize, qix_target: usize) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates
+            .push(CP::new(phase, qix_control, qix_target).into());
+    }
+
+    /// Adds the CRX gate to the circuit.
+    pub fn g_crx(&mut self, angle: f64, qix_control: usize, qix_target: usize) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates
+            .push(CRX::new(angle, qix_control, qix_target).into());
+    }
+
+    /// Adds the CRY gate to the circuit.
+    pub fn g_cry(&mut self, angle: f64, qix_control: usize, qix_target: usize) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates
+            .push(CRY::new(angle, qix_control, qix_target).into());
+    }
+
+    /// Adds the CRZ gate to the circuit.
+    pub fn g_crz(&mut self, angle: f64, qix_control: usize, qix_target: usize) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates
+            .push(CRZ::new(angle, qix_control, qix_target).into());
+    }
+
+    /// Adds the CH gate to the circuit.
+    pub fn g_ch(&mut self, qix_control: usize, qix_target: usize) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates.push(CH::new(qix_control, qix_target).into());
+    }
+
     /// Adds the SWAP gate to the circuit.
     pub fn g_swap(&mut self, qix1: usize, qix2: usize) {
         assert!(qix1 < self.n_qubits && qix2 < self.n_qubits);
@@ -241,7 +311,7 @@ impl QuantumCircuit {
     }
 
     /// Adds the Toffoli gate to the circuit.
-    pub fn g_toff(&mut self, qix_control1: usize, qix_control2: usize, qix_target: usize) {
+    pub fn g_cxx(&mut self, qix_control1: usize, qix_control2: usize, qix_target: usize) {
         assert!(
             qix_control1 < self.n_qubits
                 && qix_control2 < self.n_qubits
@@ -249,6 +319,56 @@ impl QuantumCircuit {
         );
         self.gates
             .push(Toffoli::new((qix_control1, qix_control2), qix_target).into());
+    }
+
+    /// Adds the Fredkit gate to the circuit.
+    pub fn g_cswap(&mut self, qix_control: usize, qix_target1: usize, qix_target2: usize) {
+        assert!(
+            qix_control < self.n_qubits
+                && qix_target1 < self.n_qubits
+                && qix_target2 < self.n_qubits
+        );
+        self.gates
+            .push(Fredkin::new(qix_control, (qix_target1, qix_target2)).into());
+    }
+
+    /// Adds the CU gate to the circuit.
+    pub fn g_cu(
+        &mut self,
+        theta: f64,
+        phi: f64,
+        lambda: f64,
+        gamma: f64,
+        qix_control: usize,
+        qix_target: usize,
+    ) {
+        assert!(qix_control < self.n_qubits && qix_target < self.n_qubits);
+        self.gates
+            .push(CU::new(theta, phi, lambda, gamma, qix_control, qix_target).into());
+    }
+
+    /// Adds the U gate to the circuit.
+    pub fn g_u(&mut self, theta: f64, phi: f64, lambda: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(U::new(theta, phi, lambda, qix).into());
+    }
+
+    /// Adds the U1 gate to the circuit.
+    pub fn g_u1(&mut self, lambda: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(U1::new(lambda, qix).into());
+    }
+
+    /// Adds the U2 gate to the circuit.
+    pub fn g_u2(&mut self, phi: f64, lambda: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(U2::new(phi, lambda, qix).into());
+    }
+
+    /// Adds the U3 gate to the circuit.
+    pub fn g_u3(&mut self, theta: f64, phi: f64, lambda: f64, qix: usize) {
+        assert!(qix < self.n_qubits);
+        self.gates.push(U3::new(theta, phi, lambda, qix).into());
     }
 
     /// Evaluates the circuit to a single block, equivalent to the matrix
@@ -341,7 +461,7 @@ pub trait Braket: Sized {
 
     /// Returns the bra of the quantum state.
     /// The bra is a row vector that represents the conjugate transpose of the quantum state.
-    fn bra(&self) -> OMatrix<Complex<f64>, U1, Dyn> {
+    fn bra(&self) -> OMatrix<Complex<f64>, nalgebra::U1, Dyn> {
         self.ket().transpose().conjugate()
     }
 

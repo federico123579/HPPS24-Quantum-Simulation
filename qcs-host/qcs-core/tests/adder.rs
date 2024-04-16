@@ -3,9 +3,9 @@ use qcs_core::model::{QRegister, QuantumCircuit, Qubit};
 #[test]
 fn full_adder() {
     let mut circuit = QuantumCircuit::new(4);
-    circuit.g_toff(0, 1, 3);
+    circuit.g_cxx(0, 1, 3);
     circuit.g_cx(0, 1);
-    circuit.g_toff(1, 2, 3);
+    circuit.g_cxx(1, 2, 3);
     circuit.g_cx(1, 2);
     circuit.g_cx(0, 1);
 
