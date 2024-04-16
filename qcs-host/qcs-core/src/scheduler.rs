@@ -18,6 +18,7 @@ use crate::{
 /// A plan of instructions to be executed in the simulator
 /// The plan is a list of instructions that can be executed in parallel
 /// and the dependencies between them.
+#[derive(Debug, Clone)]
 pub struct ContractionPlan {
     /// The instructions to be executed.
     instructions: HashMap<usize, Instruction>,

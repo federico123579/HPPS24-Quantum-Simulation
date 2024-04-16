@@ -5,7 +5,7 @@ use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
     executor::CpuExecutor,
-    model::{QRegister, Qubit, TensorProduct},
+    model::{gates::QuantumGate, QRegister, Qubit, TensorProduct},
     scheduler::ContractionPlan,
 };
 
@@ -19,17 +19,22 @@ fn main() {
     let circuit = parse_program(args.input).unwrap();
 
     let tensor_net = TensorNetwork::from(circuit.clone());
-    let mut contracted_nodes = tensor_net.contract().into_iter();
+    let contracted_nodes = tensor_net.contract().into_iter();
 
     let mut blocks = Vec::new();
 
-    while let Some(TensorKind::Contraction(contr)) = contracted_nodes.next() {
-        let plan = ContractionPlan::from(*contr);
-        println!("{}", &plan);
-        let exec = CpuExecutor::new();
-        let start = std::time::Instant::now();
-        blocks.extend(exec.execute(plan));
-        println!("Time: {:?}", start.elapsed());
+    for node in contracted_nodes {
+        match node {
+            TensorKind::Contraction(contr) => {
+                let plan = ContractionPlan::from(*contr);
+                println!("{}", &plan);
+                let exec = CpuExecutor::new();
+                let start = std::time::Instant::now();
+                blocks.extend(exec.execute(plan));
+                println!("Time: {:?}", start.elapsed());
+            }
+            TensorKind::Gate(g) => blocks.push((*g).spanned_block()),
+        }
     }
 
     let eval = blocks.into_iter().fold(None, |acc, block| match acc {

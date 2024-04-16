@@ -63,13 +63,13 @@ fn contract(circuit: &QuantumCircuit) -> Result<Block> {
     let tensor_net = TensorNetwork::from(circuit.clone());
     let contracted_nodes = tensor_net.contract().into_iter();
 
-    let mut instructions = Vec::new();
     let mut blocks = Vec::new();
 
     for node in contracted_nodes {
         match node {
             TensorKind::Contraction(contr) => {
                 let mut plan = ContractionPlan::from(*contr);
+                let plan_clone = plan.clone();
                 println!("{}", plan);
 
                 let mut ready = plan.fetch_ready();
@@ -80,17 +80,18 @@ fn contract(circuit: &QuantumCircuit) -> Result<Block> {
                     }
 
                     plan.set_done(ready.iter().map(|i| i.id));
-                    instructions.extend(ready);
                     println!("............................................");
                     ready = plan.fetch_ready();
                 }
+
+                let exec = CpuExecutor::new();
+                let start = std::time::Instant::now();
+                blocks.extend(exec.execute(plan_clone));
+                println!("Time: {:?}", start.elapsed());
             }
             TensorKind::Gate(g) => blocks.push((*g).spanned_block()),
         }
     }
-
-    let mut exec = CpuExecutor::new();
-    blocks.extend(exec.execute(instructions));
 
     let eval = blocks.into_iter().fold(None, |acc, block| match acc {
         None => Some(block),
