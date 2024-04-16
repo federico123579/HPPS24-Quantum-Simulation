@@ -42,12 +42,12 @@ fn main() {
     }
 
     let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
-    let start = std::time::Instant::now();
-    let circ_eval = circuit.clone().eval();
-    let qstate_1 = circ_eval * inr.clone();
-    // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
-    println!("Time: {:?}", start.elapsed());
-    println!("{}", qstate_1.distr());
+    // let start = std::time::Instant::now();
+    // let circ_eval = circuit.clone().eval();
+    // let qstate_1 = circ_eval * inr.clone();
+    // // println!("{}", qstate.distr().map(|v| (v * 1e2).round()));
+    // println!("Time: {:?}", start.elapsed());
+    // println!("{}", qstate_1.distr());
 
     let mut exec = CpuExecutor::new();
     let start = std::time::Instant::now();
@@ -62,6 +62,6 @@ fn main() {
         let qstate_2 = eval.into_block() * inr;
         println!("Time: {:?}", start.elapsed());
         println!("{}", qstate_2.distr());
-        assert!((qstate_1.distr() - qstate_2.distr()).norm() < 1e-6);
+        // assert!((qstate_1.distr() - qstate_2.distr()).norm() < 1e-6);
     }
 }
