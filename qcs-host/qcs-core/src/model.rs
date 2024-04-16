@@ -381,11 +381,11 @@ impl QuantumCircuit {
             let span = gate.span();
             let mut gate_block = gate.block();
             let mut new_block = Block::one();
-            for i in 0..span.min() {
+            for i in 0..span.start() {
                 new_block = new_block.tensor_product(Identity::new(i));
             }
             new_block = new_block.tensor_product(gate_block);
-            for i in (span.max() + 1)..self.n_qubits {
+            for i in (span.end() + 1)..self.n_qubits {
                 new_block = new_block.tensor_product(Identity::new(i));
             }
             gate_block = new_block;

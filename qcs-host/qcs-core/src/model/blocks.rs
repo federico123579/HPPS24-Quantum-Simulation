@@ -198,11 +198,11 @@ impl SpannedBlock {
     /// in the right order.
     pub fn adapt_to_span(mut self, span: Span) -> Self {
         let mut new_block = Block::one();
-        for i in span.min()..self.span.min() {
+        for i in span.start()..self.span.start() {
             new_block = new_block.tensor_product(Identity::new(i));
         }
         new_block = new_block.tensor_product(self.block);
-        for i in (self.span.max() + 1)..(span.max() + 1) {
+        for i in (self.span.end() + 1)..(span.end() + 1) {
             new_block = new_block.tensor_product(Identity::new(i));
         }
         self.block = new_block;

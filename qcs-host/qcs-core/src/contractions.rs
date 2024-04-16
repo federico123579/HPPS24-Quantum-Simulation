@@ -17,7 +17,7 @@ use petgraph::{
 
 use crate::model::{
     gates::{Gate, QuantumGate},
-    span::{Span, SpanRegister},
+    span::{GateSliceView, Span},
     QuantumCircuit,
 };
 
@@ -73,9 +73,9 @@ impl TensorNetwork {
         self.graph
             .edge_references()
             .filter(|e| {
-                let source = self.graph.node_weight(e.source()).unwrap();
-                let target = self.graph.node_weight(e.target()).unwrap();
-                let max_span = source.span().inner_join(&target.span()).unwrap();
+                let source = self.graph.node_weight(e.source()).unwrap().span().filled();
+                let target = self.graph.node_weight(e.target()).unwrap().span().filled();
+                let max_span = source.inner_join(&target).unwrap();
                 e.weight() == &max_span
             })
             .collect()
@@ -138,12 +138,12 @@ impl From<QuantumCircuit> for TensorNetwork {
         let QuantumCircuit { gates, .. } = circuit;
         let mut graph = StableDiGraph::new();
         // This will be used as a vertical slice of the last gate in each qubit lane
-        let mut span_register = SpanRegister::new();
+        let mut span_register = GateSliceView::new();
         for gate in gates.into_iter() {
             let tensor = TensorKind::Gate(Box::new(gate));
             let current_span = tensor.span().clone();
             let new_node = graph.add_node(tensor);
-            let linked_spans = span_register.get(&current_span.clone());
+            let linked_spans = span_register.get(&current_span.filled());
             span_register.apply(current_span, new_node);
             for (span, node) in linked_spans {
                 graph.add_edge(node, new_node, span);

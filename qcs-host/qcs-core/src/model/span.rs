@@ -1,6 +1,10 @@
 //! Span types for representing ranges of lanes in a gate or multiple gates.
 
-use std::{cmp::Ordering, iter::once, ops::Range};
+use std::{
+    cmp::Ordering,
+    iter::once,
+    ops::{Range, RangeInclusive},
+};
 
 /// Span type for representing ranges of lanes in a gate. This is useful for
 /// representing the control and target lanes of a gate, or the lanes covered
@@ -43,6 +47,12 @@ impl Span {
         Span(range.collect())
     }
 
+    /// Creates a new span from a range of lanes
+    #[inline]
+    pub fn range_in(range: RangeInclusive<usize>) -> Self {
+        Span(range.collect())
+    }
+
     /// Returns the number of lanes covered in the span
     #[inline]
     pub fn span_len(&self) -> usize {
@@ -51,14 +61,19 @@ impl Span {
 
     /// Returns the minimum lane in the span
     #[inline]
-    pub fn min(&self) -> usize {
+    pub fn start(&self) -> usize {
         *self.0.first().unwrap()
     }
 
     /// Returns the maximum lane in the span
     #[inline]
-    pub fn max(&self) -> usize {
+    pub fn end(&self) -> usize {
         *self.0.last().unwrap()
+    }
+
+    /// Return a new Span covering all lanes from start to end
+    pub fn filled(&self) -> Self {
+        Span::range_in(self.start()..=self.end())
     }
 
     /// Return if value is in the span
@@ -197,16 +212,19 @@ impl From<usize> for Span {
     }
 }
 
-/// A SpanRegister is like a sliding vertical view that walks over a quantum
+/// A `GateSliceView` is like a sliding vertical view that walks over a quantum
 /// circuit and keeps track of the spans that are covered by gates.
-/// Every time a gate is applied to the circuit, the register is updated with
-/// the span of lanes that the gate covers.
+/// Every time a gate is applied to the circuit, the view is updated with
+/// the span of lanes that the gate covers (from start to end).
+///
+/// It is important to note that the entire range of values between the start
+/// and end of the span will be added to the register.
 ///
 /// ```
-/// # use qcs_core::model::span::{Span, SpanRegister};
-/// let mut reg = SpanRegister::new();
+/// # use qcs_core::model::span::{Span, GateSliceView};
+/// let mut reg = GateSliceView::new();
 ///
-/// reg.apply(Span::range(0..5), 1);
+/// reg.apply(Span::new(&[0, 5]), 1);
 /// // This will override the value 1 in the span [1] with the value 2
 /// reg.apply(Span::range(1..2), 2);
 /// // This will override the value 1 in the span [0] with the value 3
@@ -219,26 +237,25 @@ impl From<usize> for Span {
 /// assert!(res.contains(&(Span::range(1..2), 2)));
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct SpanRegister<T: Clone> {
+pub struct GateSliceView<T: Clone> {
     spans: Vec<(Span, T)>,
 }
 
-impl<T: Clone> SpanRegister<T> {
+impl<T: Clone> GateSliceView<T> {
     /// Creates an empty SpanRegister
     pub fn new() -> Self {
-        SpanRegister { spans: Vec::new() }
+        GateSliceView { spans: Vec::new() }
     }
 
     /// Applies value to span in span register, overwriting all portions of other
     /// spans that are covered by the new span.
     pub fn apply(&mut self, span: Span, value: T) {
-        let span_c = span.clone();
         self.spans = self
             .spans
             .clone()
             .into_iter()
-            .filter_map(|(s, v)| Some((s.exclude(&span_c)?, v)))
-            .chain(once((span, value)))
+            .filter_map(|(s, v)| Some((s.exclude(&span.filled())?, v)))
+            .chain(once((span.filled(), value)))
             .collect();
     }
 
@@ -258,9 +275,9 @@ mod tests {
     /// Test if the SpanRegister works as expected
     #[test]
     fn test_span_register() {
-        use super::SpanRegister;
+        use super::GateSliceView;
 
-        let mut register = SpanRegister::new();
+        let mut register = GateSliceView::new();
         register.apply(Span::range(0..5), 1);
         register.apply(Span::range(1..2), 2);
         dbg!(&register);
