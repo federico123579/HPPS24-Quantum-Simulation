@@ -1231,8 +1231,8 @@ impl QuantumGate for Fredkin {
             for i in *start..=*end {
                 c = match i {
                     _ if i == self.control => c.tensor_product(Qubit::one().ketbra()),
-                    _ if i == self.target.0 => c.tensor_product(a.ket() * b.ket()),
-                    _ if i == self.target.1 => c.tensor_product(b.ket() * a.ket()),
+                    _ if i == self.target.0 => c.tensor_product(a.ket() * b.bra()),
+                    _ if i == self.target.1 => c.tensor_product(b.ket() * a.bra()),
                     _ => c.tensor_product(Block::identity(2)),
                 };
             }
