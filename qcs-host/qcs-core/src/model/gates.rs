@@ -1463,12 +1463,26 @@ impl QuantumGate for CU {
     }
 
     fn matrix(&self) -> DMatrix<Complex<f64>> {
-        let a = phase_matrix(self.gamma - self.theta / 2.0).tensor_product(Block::identity(2));
+        let mut a = Block::one().into_matrix();
+        let start = usize::min(self.control, self.target);
+        let end = usize::max(self.control, self.target);
+
+        for i in start..=end {
+            a = match i {
+                _ if i == self.control => {
+                    a.tensor_product(phase_matrix(self.gamma - self.theta / 2.0))
+                }
+                _ if i == self.target => a.tensor_product(Block::identity(2)),
+                _ => a.tensor_product(Block::identity(2)),
+            };
+        }
+
         let b = controlled_gate_block(
             self.control,
             self.target,
             universal_matrix(self.theta, self.phi, self.lambda),
         );
+
         a * b
     }
 }
