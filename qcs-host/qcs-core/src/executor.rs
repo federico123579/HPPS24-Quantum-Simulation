@@ -4,50 +4,48 @@
 //! As for now there is only one executor, the `CpuExecutor`, which is responsible for
 //! executing the instructions on the CPU.
 
-use std::sync::{Arc, Mutex};
+use std::{sync::Arc, thread::JoinHandle};
 
-use hashbrown::HashMap;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use crossbeam::channel::unbounded;
+use dashmap::{DashMap, DashSet};
 
 use crate::{
     model::blocks::SpannedBlock,
-    scheduler::{Instruction, InstructionOperand},
+    scheduler::{ContractionPlan, Instruction, InstructionOperand},
 };
 
 /// The `CpuExecutor` is responsible for executing the instructions on the CPU.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct CpuExecutor {
     /// The memory of the executor, which is a map from the id of the block to the block itself.
-    memory: Arc<Mutex<HashMap<usize, SpannedBlock>>>,
+    memory: Arc<DashMap<usize, SpannedBlock>>,
+    threads: Vec<JoinHandle<()>>,
 }
 
-impl CpuExecutor {
-    /// Creates a new `CpuExecutor`.
-    pub fn new() -> Self {
-        Self {
-            memory: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+trait BlockStore {
+    fn load_block(&self, operand: InstructionOperand) -> SpannedBlock;
+    fn save_block(&self, id: usize, block: SpannedBlock);
+    fn prepare_computation(&self, instruction: Instruction) -> Computation;
+}
 
+impl BlockStore for DashMap<usize, SpannedBlock> {
     /// Loads a block from memory or from the instruction.
     #[inline]
     fn load_block(&self, instruction: InstructionOperand) -> SpannedBlock {
         match instruction {
             InstructionOperand::Gate(gate) => gate.into(),
-            InstructionOperand::Address(address) => {
-                self.memory.lock().unwrap().remove(&address).unwrap()
-            }
+            InstructionOperand::Address(address) => self.remove(&address).unwrap().1,
         }
     }
 
     /// Saves a block in memory.
     #[inline]
     fn save_block(&self, id: usize, block: SpannedBlock) {
-        self.memory.lock().unwrap().insert(id, block);
+        self.insert(id, block);
     }
 
-    /// Executes a single instruction, updating the memory meanwhile.
-    fn execute_single(&self, instruction: Instruction) {
+    /// Prepare the execution of a single instruction.
+    fn prepare_computation(&self, instruction: Instruction) -> Computation {
         let Instruction {
             id, first, second, ..
         } = instruction;
@@ -55,26 +53,106 @@ impl CpuExecutor {
         let first_block = self.load_block(first);
         let second_block = self.load_block(second);
 
-        let new_span = first_block.merged_span(&second_block);
-        let first_block = first_block.adapt_to_span(new_span.clone());
-        let second_block = second_block.adapt_to_span(new_span);
+        Computation {
+            wid: id,
+            block1: first_block,
+            block2: second_block,
+        }
+    }
+}
 
-        let result = first_block * second_block;
-        self.save_block(id, result);
+impl CpuExecutor {
+    /// Creates a new `CpuExecutor`.
+    pub fn new() -> Self {
+        Self {
+            memory: Arc::new(DashMap::new()),
+            threads: Vec::new(),
+        }
     }
 
-    /// Executes a list of instructions, returning the equivalent blocks after
-    /// conducting all the operations.
-    pub fn execute(&mut self, instructions: Vec<Instruction>) -> Vec<SpannedBlock> {
-        // Parallel execution of all indipendent instructions.
-        instructions.into_par_iter().for_each(|instruction| {
-            self.execute_single(instruction);
+    /// Spawns a new thread and keeps track of it.
+    pub fn spawn<F>(&mut self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.threads.push(std::thread::spawn(f))
+    }
+
+    /// Wait for all thread completion.
+    pub fn join_all(&mut self) {
+        for thread in self.threads.drain(..) {
+            let _ = thread.join();
+        }
+    }
+
+    /// Execute a contraction plan, in parallel.
+    pub fn execute(mut self, mut plan: ContractionPlan) -> Vec<SpannedBlock> {
+        // create a channel to communicate the need of more instructions
+        let (wtx, wrx) = unbounded();
+        let (itx, irx) = unbounded();
+        // create a set of usize to keep track of current execution
+        let executing = Arc::new(DashSet::new());
+
+        // spawn a thread that fills the queue with the ready instructions
+        self.spawn(move || {
+            for instruction in plan.fetch_ready() {
+                executing.insert(instruction.id);
+                itx.send(instruction).unwrap();
+            }
+            while let Ok(id) = wrx.recv() {
+                plan.set_done(std::iter::once(id));
+                for instruction in plan
+                    .fetch_ready()
+                    .into_iter()
+                    .filter(|i| executing.insert(i.id))
+                {
+                    itx.send(instruction).unwrap();
+                }
+                if plan.is_empty() {
+                    break;
+                }
+            }
         });
-        self.memory
-            .lock()
+
+        // spawn many thread as cpu cores to execute the instructions
+        for _ in 0..num_cpus::get() {
+            let wtx_clone = wtx.clone();
+            let irx_clone = irx.clone();
+            let block_map = Arc::clone(&self.memory);
+            self.spawn(move || {
+                while let Ok(instruction) = irx_clone.recv() {
+                    let computation = block_map.prepare_computation(instruction);
+                    let (id, result) = computation.compute();
+                    block_map.save_block(id, result);
+                    if wtx_clone.send(id).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        // wait for all threads to finish
+        self.join_all();
+
+        Arc::try_unwrap(self.memory)
             .unwrap()
-            .drain()
+            .into_iter()
             .map(|(_, block)| block)
             .collect()
+    }
+}
+
+struct Computation {
+    wid: usize,
+    block1: SpannedBlock,
+    block2: SpannedBlock,
+}
+
+impl Computation {
+    fn compute(self) -> (usize, SpannedBlock) {
+        let new_span = self.block1.merged_span(&self.block2);
+        let first_block = self.block1.adapt_to_span(new_span.clone());
+        let second_block: SpannedBlock = self.block2.adapt_to_span(new_span);
+        (self.wid, first_block * second_block)
     }
 }

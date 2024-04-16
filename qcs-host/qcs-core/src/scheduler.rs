@@ -43,6 +43,7 @@ impl ContractionPlan {
     pub fn set_done(&mut self, ids: impl IntoIterator<Item = usize>) {
         for id in ids {
             assert!(self.waiting_dep.get(&id).unwrap().is_empty());
+            self.instructions.remove(&id);
             self.waiting_dep.remove(&id);
             let deps = self.dependants.remove(&id).unwrap();
             for dep in deps {
@@ -58,8 +59,13 @@ impl ContractionPlan {
         let ready = self.get_ready();
         ready
             .iter()
-            .map(|id| self.instructions.remove(id).unwrap())
+            .map(|id| self.instructions.get(id).unwrap().clone())
             .collect()
+    }
+
+    /// Check if the plan is empty.
+    pub fn is_empty(&self) -> bool {
+        self.instructions.is_empty()
     }
 }
 
