@@ -1,9 +1,14 @@
-alias b := build
+alias bd := build-debug
+alias br := build-release
 alias c := clean
 alias d := doc
 alias t := test
 
-build:
+build-debug:
+    cargo build
+    mv target/debug/qcs-bins qcs
+
+build-release:
     cargo build --release
     mv target/release/qcs-bins qcs
 
