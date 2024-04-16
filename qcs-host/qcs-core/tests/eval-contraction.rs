@@ -25,6 +25,8 @@ macro_rules! test_circuit {
 }
 
 test_circuit!(q2_00, "q2-00.txt");
+test_circuit!(q2_01, "q2-01.qasm");
+test_circuit!(q2_02, "q2-02.qasm");
 test_circuit!(q3_00, "q3-00.txt");
 test_circuit!(q3_01, "q3-01.txt");
 test_circuit!(q3_02, "q3-02.txt");
@@ -32,6 +34,8 @@ test_circuit!(unlinked_disjointed_spans, "q3-03.qasm");
 test_circuit!(q5_00, "q5-00.txt");
 test_circuit!(q5_01, "q5-01.txt");
 test_circuit!(full_adder, "full-adder.txt");
+test_circuit!(full_adder_qasm, "full-adder.qasm");
+test_circuit!(quantum_fourier_transform, "qft.qasm");
 
 fn zero_register(n_qubits: usize) -> QRegister {
     QRegister::from((0..n_qubits).map(|_| Qubit::zero()))
