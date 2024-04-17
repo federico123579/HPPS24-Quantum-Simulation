@@ -97,6 +97,14 @@ The dependency list contains for each instruction, the list of instructions on w
 
 The dependecy list contains for each instruction, the list of instructions that depend on it. 
 
-TODO: add dependant list
+```
+0: []
+1: [0]
+2: [0]
+3: [1]
+4: [1]
+5: [4]
+6: [5]
+```
 
 == ISA and below (hardware)
