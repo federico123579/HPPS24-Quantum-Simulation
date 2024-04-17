@@ -85,7 +85,15 @@ From the instruction list, we can add the list of dependencies and dependants.
 
 The dependency list contains for each instruction, the list of instructions on which it depends.
 
-TODO: add dependency list
+```
+0: [1,2]
+1: [3,4]
+2: []
+3: []
+4: [5]
+5: [6]
+6: []
+```
 
 The dependecy list contains for each instruction, the list of instructions that depend on it. 
 
