@@ -5,12 +5,18 @@ Quantum Computers provide an exponential speedup with respect to classical compu
 
 To simulate quantum circuits on classical computers we use the tensor contraction approach, in which a quantum circuit is contracted up to a single expression of tensor operations (contractions and expansions).
 
-= Notation
+= Glossary
 
 - DFS: depth first search
+- hw: hardware
 - I: identity matrix
 - TC: tensor contraction; it's a matrix multiplication (\*)
 - TE: tensor expansion; it's a tensor product (x)
+
+= Notation
+- regarding instructions:
+  - [ ] for data on host
+  - ( ) for data on hardware
 
 = Example
 
@@ -108,3 +114,24 @@ The dependecy list contains for each instruction, the list of instructions that 
 ```
 
 == ISA and below (hardware)
+Assumption: the data is loaded for each instruction, so for example for instruction 2 the hardware receives the instruction and then loads (if it doesn't have them) tensors D and I.
+
+=== from host to hw
+Load is used to move data from host to hw in register specified by \$ sign.
+TE is the operation of tensor expansion (the tensor product). The [D] tells us that the data of gate D is on the host, while (I) means that the data is on hw. 
+```
+LOAD [D], $0
+TE, $0, (I)
+```
+TBD: TE is non-trivil -> ideally decompose it with simpler procedure on hw. 
+
+E.g.:
+suppose C = TE(A,B) = A x B,
+A = [a,b], B = [c,d] -> C = [a*b, c*d]
+for each element in i-th row, j-th col of A (aij), the corresponding element in c is aij*B (so B multiplied by the scalar aij)
+
+Because of this, the tensor product dimensions are explicitely dependend only on matrix B, since matrix A can be decomposed/tiled by preference.
+
+=== from hw to host
+TBD (to be defined)
+ideally, some ack on when the computation is ready and the address where the result is stored
