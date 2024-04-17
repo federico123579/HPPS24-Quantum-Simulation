@@ -69,7 +69,15 @@ where N is the instruction number, S is the operator (\* for TC and x for TE) an
 
 For the circuit under consideration the instruction list is:
 
-TODO: add instruction list
+```
+0: *, 1, 2
+1: *, 3, 4
+3: x, A, I
+4: x, I, 5
+5: *, C, 6
+6: x, I, E
+2: x, D, I
+```
 
 == Dependencies and Dependants
 
