@@ -5,15 +5,17 @@ alias d := doc
 alias t := test
 
 build-debug:
-    cargo build
-    mv target/debug/qcs-bins qcs
+    cargo build --bins
+    mv target/debug/export qcs-export
+    mv target/debug/compute qcs-compute
 
 build-release:
-    cargo build --release
-    mv target/release/qcs-bins qcs
+    cargo build --release --bins
+    mv target/release/export qcs-export
+    mv target/release/compute qcs-compute
 
 clean:
-    rm -i ./qcs
+    rm -i ./qcs-export ./qcs-compute
 
 doc:
     cargo doc
