@@ -19,10 +19,17 @@ run-combined: build-release
     mv golden-vectors.dat ../../hls/src/tests/combined/golden-vectors.dat
 
 build-debug:
-    cargo build
+    cargo build --bins
+    mv target/debug/export qcs-export
+    mv target/debug/compute qcs-compute
 
 build-release:
-    cargo build --release
+    cargo build --release --bins
+    mv target/release/export qcs-export
+    mv target/release/compute qcs-compute
+
+clean:
+    rm -i ./qcs-export ./qcs-compute
 
 doc:
     cargo doc

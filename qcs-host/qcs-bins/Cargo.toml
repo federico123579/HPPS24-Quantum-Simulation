@@ -10,3 +10,4 @@ qcs-circuit-parser = { path = "../qcs-circuit-parser" }
 qcs-core = { path = "../qcs-core" }
 clap = { version = "4.5.4", features = ["derive"] }
 nalgebra = "0.32.5"
+rusqlite = "0.31.0"
