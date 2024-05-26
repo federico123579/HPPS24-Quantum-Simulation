@@ -17,6 +17,7 @@ trait Serialize {
 impl Serialize for DMatrix<Complex<f64>> {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
+        bytes.extend_from_slice(&(self.len().to_le_bytes()));
         self.iter().for_each(|c| {
             bytes.extend_from_slice(&c.re.to_le_bytes());
             bytes.extend_from_slice(&c.im.to_le_bytes());
@@ -36,6 +37,7 @@ impl TE {
     }
 
     fn id(size: usize) -> DMatrix<Complex<f64>> {
+        let size = size * 2;
         DMatrix::from_iterator(
             size,
             size,
@@ -122,19 +124,12 @@ impl BinFile {
     fn add_te(&mut self, te: TE) -> std::io::Result<()> {
         // input
         let in_left_bytes = te.left.serialize();
-        let in_left_prolog = in_left_bytes.len().to_le_bytes();
         let in_right_bytes = te.right.serialize();
-        let in_right_prolog = in_right_bytes.len().to_le_bytes();
-
         // output
         let out_bytes = te.compute().serialize();
-        let out_prolog = out_bytes.len().to_le_bytes();
 
-        self.file.write_all(&in_left_prolog)?;
         self.file.write_all(&in_left_bytes)?;
-        self.file.write_all(&in_right_prolog)?;
         self.file.write_all(&in_right_bytes)?;
-        self.file.write_all(&out_prolog)?;
         self.file.write_all(&out_bytes)?;
         Ok(())
     }
@@ -173,7 +168,7 @@ fn main() {
         Gate::from(U::new(1.0, 2.0, 3.0, 0)),
     ];
 
-    let mut bfile = BinFile::new(PathBuf::from("golden-vectors.bin")).unwrap();
+    let mut bfile = BinFile::new(PathBuf::from("golden-vectors.dat")).unwrap();
 
     for gate in gates {
         let te1 = gate.left_te(1);
