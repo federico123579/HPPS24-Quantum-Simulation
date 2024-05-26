@@ -39,3 +39,11 @@ CREATE TABLE IF NOT EXISTS `gates` (
     `data` BLOB NOT NULL,
     PRIMARY KEY(`id`)
 );
+CREATE TABLE IF NOT EXISTS `experiments` (
+    `id` INTEGER,
+    `program_id` INTEGER NOT NULL,
+    `input_vector` BLOB NOT NULL,
+    `output_vector` BLOB NOT NULL,
+    PRIMARY KEY(`id`),
+    FOREIGN KEY(`program_id`) REFERENCES `programs`(`id`)
+);
