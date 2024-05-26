@@ -2,6 +2,7 @@ alias bd := build-debug
 alias br := build-release
 alias d := doc
 alias t := test
+alias e := export
 
 _default:
     just --choose
@@ -36,3 +37,6 @@ doc:
 
 test:
     cargo nextest run && cargo test --doc
+
+export: build-release
+    ./qcs-export ./circuits/*.qasm ../analysis/qiskit-jn/q07-05.qasm ../analysis/qiskit-jn/q09-05.qasm ../analysis/qiskit-jn/q10-05.qasm ../analysis/qiskit-jn/q10-10.qasm

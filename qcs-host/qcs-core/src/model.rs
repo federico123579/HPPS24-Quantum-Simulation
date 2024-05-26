@@ -88,7 +88,7 @@ impl From<Qubit> for DVector<Complex<f64>> {
 /// A quantum register is a collection of qubits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QRegister {
-    qubits: DVector<Complex<f64>>,
+    pub qubits: DVector<Complex<f64>>,
 }
 
 impl QRegister {
