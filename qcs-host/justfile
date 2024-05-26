@@ -4,6 +4,10 @@ alias c := clean
 alias d := doc
 alias t := test
 
+run: build-release
+    ./qcs
+    mv golden-vectors.dat ../../hls/tensor-expansion/golden-vectors.dat
+
 build-debug:
     cargo build
     mv target/debug/qcs-bins qcs
