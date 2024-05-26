@@ -747,6 +747,7 @@ name = "qcs-bins"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "nalgebra",
  "qcs-circuit-parser",
  "qcs-core",
 ]

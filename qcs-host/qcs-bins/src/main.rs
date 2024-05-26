@@ -1,50 +1,191 @@
-use std::path::PathBuf;
-
-use clap::Parser;
-use qcs_circuit_parser::parse_program;
-use qcs_core::{
-    contractions::{TensorKind, TensorNetwork},
-    executor::CpuExecutor,
-    model::{gates::QuantumGate, QRegister, Qubit, TensorProduct},
-    scheduler::ContractionPlan,
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
 };
 
-#[derive(Debug, Clone, Parser)]
-struct Cli {
-    input: PathBuf,
+use nalgebra::{Complex, DMatrix};
+use qcs_core::model::gates::{
+    Fredkin, Gate, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, QuantumGate, Swap, Toffoli,
+    CH, CP, CRX, CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, SX, U, U1, U2, U3,
+};
+
+trait Serialize {
+    fn serialize(&self) -> Vec<u8>;
+}
+
+impl Serialize for DMatrix<Complex<f64>> {
+    fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        self.iter().for_each(|c| {
+            bytes.extend_from_slice(&c.re.to_le_bytes());
+            bytes.extend_from_slice(&c.im.to_le_bytes());
+        });
+        bytes
+    }
+}
+
+struct TE {
+    left: DMatrix<Complex<f64>>,
+    right: DMatrix<Complex<f64>>,
+}
+
+impl TE {
+    fn new(left: DMatrix<Complex<f64>>, right: DMatrix<Complex<f64>>) -> Self {
+        Self { left, right }
+    }
+
+    fn id(size: usize) -> DMatrix<Complex<f64>> {
+        DMatrix::from_iterator(
+            size,
+            size,
+            (0..size).flat_map(|i| {
+                (0..size).map(move |j| {
+                    if i == j {
+                        Complex::new(1.0, 0.0)
+                    } else {
+                        Complex::new(0.0, 0.0)
+                    }
+                })
+            }),
+        )
+    }
+
+    fn with_left_id(id_size: usize, right: DMatrix<Complex<f64>>) -> Self {
+        Self::new(Self::id(id_size), right)
+    }
+
+    fn with_right_id(left: DMatrix<Complex<f64>>, id_size: usize) -> Self {
+        Self::new(left, Self::id(id_size))
+    }
+
+    fn compute(&self) -> DMatrix<Complex<f64>> {
+        self.left.kronecker(&self.right)
+    }
+}
+
+trait TECompatible {
+    fn as_matrix(&self) -> DMatrix<Complex<f64>>;
+    fn left_te(&self, id_size: usize) -> TE {
+        TE::with_left_id(id_size, self.as_matrix())
+    }
+    fn right_te(&self, id_size: usize) -> TE {
+        TE::with_right_id(self.as_matrix(), id_size)
+    }
+}
+
+impl TECompatible for Gate {
+    fn as_matrix(&self) -> DMatrix<Complex<f64>> {
+        match self {
+            Gate::Hadamard(h) => h.matrix(),
+            Gate::Identity(i) => i.matrix(),
+            Gate::PauliX(x) => x.matrix(),
+            Gate::PauliY(y) => y.matrix(),
+            Gate::PauliZ(z) => z.matrix(),
+            Gate::Phase(p) => p.matrix(),
+            Gate::SX(sx) => sx.matrix(),
+            Gate::RX(rx) => rx.matrix(),
+            Gate::RY(ry) => ry.matrix(),
+            Gate::RZ(rz) => rz.matrix(),
+            Gate::CX(cx) => cx.matrix(),
+            Gate::CY(cy) => cy.matrix(),
+            Gate::CZ(cz) => cz.matrix(),
+            Gate::CP(cp) => cp.matrix(),
+            Gate::CRX(crx) => crx.matrix(),
+            Gate::CRY(cry) => cry.matrix(),
+            Gate::CRZ(crz) => crz.matrix(),
+            Gate::CH(ch) => ch.matrix(),
+            Gate::Swap(swap) => swap.matrix(),
+            Gate::Toffoli(toffoli) => toffoli.matrix(),
+            Gate::Fredkin(fredkin) => fredkin.matrix(),
+            Gate::CU(cu) => cu.matrix(),
+            Gate::U1(u1) => u1.matrix(),
+            Gate::U2(u2) => u2.matrix(),
+            Gate::U3(u3) => u3.matrix(),
+            Gate::U(u) => u.matrix(),
+        }
+    }
+}
+
+struct BinFile {
+    file: BufWriter<File>,
+}
+
+impl BinFile {
+    fn new(path: PathBuf) -> std::io::Result<Self> {
+        let file = File::create(path)?;
+        Ok(Self {
+            file: BufWriter::new(file),
+        })
+    }
+
+    fn add_te(&mut self, te: TE) -> std::io::Result<()> {
+        // input
+        let in_left_bytes = te.left.serialize();
+        let in_left_prolog = in_left_bytes.len().to_le_bytes();
+        let in_right_bytes = te.right.serialize();
+        let in_right_prolog = in_right_bytes.len().to_le_bytes();
+
+        // output
+        let out_bytes = te.compute().serialize();
+        let out_prolog = out_bytes.len().to_le_bytes();
+
+        self.file.write_all(&in_left_prolog)?;
+        self.file.write_all(&in_left_bytes)?;
+        self.file.write_all(&in_right_prolog)?;
+        self.file.write_all(&in_right_bytes)?;
+        self.file.write_all(&out_prolog)?;
+        self.file.write_all(&out_bytes)?;
+        Ok(())
+    }
 }
 
 fn main() {
-    let args = Cli::parse();
-    let circuit = parse_program(args.input).unwrap();
+    let gates = vec![
+        Gate::from(Hadamard::new(0)),
+        Gate::from(Identity::new(0)),
+        Gate::from(PauliX::new(0)),
+        Gate::from(PauliY::new(0)),
+        Gate::from(PauliZ::new(0)),
+        Gate::from(Phase::new(0.0, 0)),
+        Gate::from(Phase::t(0)),
+        Gate::from(Phase::s(0)),
+        Gate::from(SX::new(0)),
+        Gate::from(RX::new(0.0, 0)),
+        Gate::from(RY::new(0.0, 0)),
+        Gate::from(RZ::new(0.0, 0)),
+        Gate::from(CX::new(0, 1)),
+        Gate::from(CX::new(1, 0)),
+        Gate::from(CY::new(0, 1)),
+        Gate::from(CZ::new(0, 1)),
+        Gate::from(CP::new(0.0, 0, 1)),
+        Gate::from(CRX::new(0.0, 0, 1)),
+        Gate::from(CRY::new(0.0, 0, 1)),
+        Gate::from(CRZ::new(0.0, 0, 1)),
+        Gate::from(CH::new(0, 1)),
+        Gate::from(Swap::new(0, 1)),
+        Gate::from(Toffoli::new((0, 1), 2)),
+        Gate::from(Fredkin::new(0, (1, 2))),
+        Gate::from(CU::new(1.0, 2.0, 3.0, 4.0, 0, 1)),
+        Gate::from(U1::new(1.0, 0)),
+        Gate::from(U2::new(1.0, 2.0, 0)),
+        Gate::from(U3::new(1.0, 2.0, 3.0, 0)),
+        Gate::from(U::new(1.0, 2.0, 3.0, 0)),
+    ];
 
-    let tensor_net = TensorNetwork::from(circuit.clone());
-    let contracted_nodes = tensor_net.contract().into_iter();
+    let mut bfile = BinFile::new(PathBuf::from("golden-vectors.bin")).unwrap();
 
-    let mut blocks = Vec::new();
+    for gate in gates {
+        let te1 = gate.left_te(1);
+        let te2 = gate.left_te(2);
+        let te3 = gate.right_te(1);
+        let te4 = gate.right_te(2);
 
-    for node in contracted_nodes {
-        match node {
-            TensorKind::Contraction(contr) => {
-                let plan = ContractionPlan::from(*contr);
-                println!("{}", &plan);
-                let exec = CpuExecutor::new();
-                let start = std::time::Instant::now();
-                blocks.extend(exec.execute(plan));
-                println!("Time: {:?}", start.elapsed());
-            }
-            TensorKind::Gate(g) => blocks.push((*g).spanned_block()),
-        }
+        bfile.add_te(te1).unwrap();
+        bfile.add_te(te2).unwrap();
+        bfile.add_te(te3).unwrap();
+        bfile.add_te(te4).unwrap();
     }
 
-    let eval = blocks.into_iter().fold(None, |acc, block| match acc {
-        None => Some(block),
-        Some(acc) => Some(acc.tensor_product(block)),
-    });
-
-    let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
-    if let Some(eval) = eval {
-        let qstate_2 = eval.into_block() * inr;
-        println!("{}", qstate_2.distr());
-    }
+    println!("Done!");
 }
