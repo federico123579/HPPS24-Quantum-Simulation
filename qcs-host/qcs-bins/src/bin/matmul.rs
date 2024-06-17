@@ -72,7 +72,7 @@ impl BinFile {
     fn add_matmul(&mut self, op: Matmul) -> std::io::Result<()> {
         // input
         let in_left_bytes = op.left.serialize();
-        let in_right_bytes = op.right.serialize();
+        let in_right_bytes = op.right.transpose().serialize();
         // output
         let out_bytes = op.compute().serialize();
 
