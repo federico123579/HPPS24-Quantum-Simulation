@@ -18,7 +18,7 @@ impl Serialize for DMatrix<Complex<f64>> {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
         bytes.extend_from_slice(&(self.len().to_le_bytes()));
-        self.iter().for_each(|c| {
+        self.transpose().iter().for_each(|c| {
             bytes.extend_from_slice(&c.re.to_le_bytes());
             bytes.extend_from_slice(&c.im.to_le_bytes());
         });

@@ -71,10 +71,10 @@ impl BinFile {
 
     fn add_matmul(&mut self, op: Matmul) -> std::io::Result<()> {
         // input
-        let in_left_bytes = op.left.serialize();
-        let in_right_bytes = op.right.transpose().serialize();
+        let in_left_bytes = op.left.transpose().serialize();
+        let in_right_bytes = op.right.serialize();
         // output
-        let out_bytes = op.compute().serialize();
+        let out_bytes = op.compute().transpose().serialize();
 
         self.file.write_all(&in_left_bytes)?;
         self.file.write_all(&in_right_bytes)?;
@@ -86,7 +86,7 @@ impl BinFile {
 fn main() {
     let ops: Vec<Matmul> = vec![
         (Hadamard::new(0), Identity::new(0)).into(),
-        (PauliX::new(0), PauliY::new(0)).into(),
+        (PauliY::new(0), PauliY::new(0)).into(),
         (PauliY::new(0), PauliZ::new(0)).into(),
         (Phase::t(0), Phase::s(0)).into(),
         (RX::new(0.0, 0), RY::new(0.0, 0)).into(),
