@@ -6,8 +6,8 @@ use std::{
 
 use nalgebra::{Complex, DMatrix};
 use qcs_core::model::gates::{
-    Fredkin, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, QuantumGate, Swap, Toffoli, CRX,
-    CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, U, U1, U2, U3,
+    Fredkin, Hadamard, Identity, PauliY, PauliZ, Phase, QuantumGate, Swap, Toffoli, CRX, CRY, CRZ,
+    CU, CX, CY, CZ, RX, RY, RZ, U, U1, U2, U3,
 };
 
 trait Serialize {

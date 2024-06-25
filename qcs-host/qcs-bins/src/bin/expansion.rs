@@ -135,6 +135,25 @@ impl BinFile {
     }
 }
 
+fn count_non_zero(matrix: &DMatrix<Complex<f64>>) -> usize {
+    matrix
+        .iter()
+        .fold(0, |a, b| if b.norm() > 1e-6 { a + 1 } else { a })
+}
+
+macro_rules! print_non_zero {
+    ($i:ident, $te:ident) => {
+        println!(
+            "{}: {} x {} = {}",
+            $i,
+            count_non_zero(&$te.left),
+            count_non_zero(&$te.right),
+            count_non_zero(&$te.compute())
+        );
+        $i += 1;
+    };
+}
+
 fn main() {
     let gates = vec![
         Gate::from(Hadamard::new(0)),
@@ -170,11 +189,16 @@ fn main() {
 
     let mut bfile = BinFile::new(PathBuf::from("golden-vectors.dat")).unwrap();
 
+    let mut i = 0;
     for gate in gates {
         let te1 = gate.left_te(1);
+        print_non_zero!(i, te1);
         let te2 = gate.left_te(2);
+        print_non_zero!(i, te2);
         let te3 = gate.right_te(1);
+        print_non_zero!(i, te3);
         let te4 = gate.right_te(2);
+        print_non_zero!(i, te4);
 
         bfile.add_te(te1).unwrap();
         bfile.add_te(te2).unwrap();
