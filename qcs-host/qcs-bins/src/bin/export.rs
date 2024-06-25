@@ -19,14 +19,20 @@ use rusqlite::{Connection, Result};
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {
+    /// Input QASM files
+    #[clap(required = true)]
     input: Vec<PathBuf>,
+
+    /// Output SQLite database
+    #[clap(short, long, default_value = "db.sqlite")]
+    output: String,
 }
 
 const SCHEMA: &str = include_str!("../../../schema.sql");
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    let conn = Connection::open("db.sqlite")?;
+    let conn = Connection::open(args.output)?;
 
     conn.execute_batch(SCHEMA)?;
 
