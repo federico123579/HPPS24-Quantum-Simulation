@@ -5,9 +5,12 @@ use std::{
 };
 
 use nalgebra::{Complex, DMatrix};
-use qcs_core::model::gates::{
-    Fredkin, Hadamard, Identity, PauliY, PauliZ, Phase, QuantumGate, Swap, Toffoli, CRX, CRY, CRZ,
-    CU, CX, CY, CZ, RX, RY, RZ, U, U1, U2, U3,
+use qcs_core::model::{
+    gates::{
+        Fredkin, Hadamard, Identity, PauliY, PauliZ, Phase, QuantumGate, Swap, Toffoli, CRX, CRY,
+        CRZ, CU, CX, CY, CZ, RX, RY, RZ, U, U1, U2, U3,
+    },
+    TensorProduct,
 };
 
 trait Serialize {
@@ -84,6 +87,12 @@ impl BinFile {
 }
 
 fn main() {
+    let u = U::new(1.0, 2.0, 3.0, 0);
+    let massive_u = u
+        .tensor_product(Identity::new(0))
+        .tensor_product(Identity::new(0))
+        .tensor_product(Identity::new(0))
+        .tensor_product(Identity::new(0));
     let ops: Vec<Matmul> = vec![
         (Hadamard::new(0), Identity::new(0)).into(),
         (PauliY::new(0), PauliY::new(0)).into(),
@@ -99,6 +108,7 @@ fn main() {
         (CU::new(1.0, 2.0, 3.0, 4.0, 0, 1), Swap::new(0, 1)).into(),
         (U2::new(1.0, 2.0, 0), U3::new(1.0, 2.0, 3.0, 0)).into(),
         (U::new(1.0, 2.0, 3.0, 0), U1::new(1.0, 0)).into(),
+        Matmul::new(massive_u.clone().into_matrix(), massive_u.into_matrix()),
     ];
 
     let mut bfile = BinFile::new(PathBuf::from("golden-vectors.dat")).unwrap();
