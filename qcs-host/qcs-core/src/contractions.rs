@@ -31,7 +31,7 @@ pub struct TensorNetwork {
 impl TensorNetwork {
     /// Contract the tensor network and return the contracted tensors.
     pub fn contract(mut self) -> Vec<TensorKind> {
-        println!("{}", self);
+        // println!("{}", self);
         loop {
             let lowest_rank = self
                 .contractable()
@@ -62,7 +62,7 @@ impl TensorNetwork {
             to_contract.into_iter().for_each(|to_contract| {
                 self.contract_edge(to_contract);
             });
-            println!("{}", self);
+            // println!("{}", self);
         }
 
         self.graph.node_weights().cloned().collect()
