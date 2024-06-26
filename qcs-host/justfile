@@ -5,18 +5,18 @@ alias d := doc
 alias t := test
 alias e := export
 
-build-debug:
+build-debug: clean
     cargo build --bins
     mv target/debug/export qcs-export
     mv target/debug/compute qcs-compute
 
-build-release:
+build-release: clean
     cargo build --release --bins
     mv target/release/export qcs-export
     mv target/release/compute qcs-compute
 
 clean:
-    rm -i ./qcs-export ./qcs-compute
+    rm -f ./qcs-export ./qcs-compute
 
 doc:
     cargo doc
@@ -24,5 +24,5 @@ doc:
 test:
     cargo nextest run && cargo test --doc
 
-export: build-release
-    ./qcs-export ./circuits/*.qasm ../analysis/qiskit-jn/q07-05.qasm ../analysis/qiskit-jn/q09-05.qasm ../analysis/qiskit-jn/q10-05.qasm ../analysis/qiskit-jn/q10-10.qasm
+export: clean build-release
+    RUST_LOG=debug ./qcs-export ./circuits/*.qasm ../analysis/qiskit-jn/q07-05.qasm ../analysis/qiskit-jn/q09-05.qasm ../analysis/qiskit-jn/q10-05.qasm ../analysis/qiskit-jn/q10-10.qasm
