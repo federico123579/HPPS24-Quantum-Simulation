@@ -11,3 +11,5 @@ qcs-core = { path = "../qcs-core" }
 clap = { version = "4.5.4", features = ["derive"] }
 nalgebra = "0.32.5"
 rusqlite = "0.31.0"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
