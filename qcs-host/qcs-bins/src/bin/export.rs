@@ -52,7 +52,9 @@ fn main() -> Result<()> {
         ];
 
         let tensor_net = TensorNetwork::from(circuit.clone());
+        let start = std::time::Instant::now();
         let contracted_nodes: IntoIter<TensorKind> = tensor_net.contract().into_iter();
+        let tree_building_time = start.elapsed();
         for node in contracted_nodes.clone() {
             conn.insert_contraction(node, program_id)?;
         }
@@ -73,7 +75,11 @@ fn main() -> Result<()> {
         }
 
         // update the program with the contraction time
-        conn.update_contraction_time(program_id, cpu_time.as_micros() as u64)?;
+        conn.update_contraction_time(
+            program_id,
+            cpu_time.as_micros() as u64,
+            tree_building_time.as_micros() as u64,
+        )?;
 
         let eval = blocks.into_iter().fold(None, |acc, block| match acc {
             None => Some(block),
@@ -131,7 +137,12 @@ trait QuantumDB {
     fn insert_gate(&self, gate: Gate) -> Result<i64>;
     fn insert_contraction(&self, contr: TensorKind, program_id: i64) -> Result<i64>;
     fn insert_program(&self, program: &Path) -> Result<i64>;
-    fn update_contraction_time(&self, id: i64, contraction_time_ms: u64) -> Result<()>;
+    fn update_contraction_time(
+        &self,
+        id: i64,
+        contraction_time_ms: u64,
+        tree_building_time_ms: u64,
+    ) -> Result<()>;
     fn insert_experiment(
         &self,
         input: QRegister,
@@ -198,10 +209,15 @@ impl QuantumDB for Connection {
         Ok(id)
     }
 
-    fn update_contraction_time(&self, id: i64, contraction_time_ms: u64) -> Result<()> {
+    fn update_contraction_time(
+        &self,
+        id: i64,
+        contraction_time_us: u64,
+        tree_building_time_us: u64,
+    ) -> Result<()> {
         self.execute(
-            "UPDATE programs SET contraction_cpu_time_us = ?1 WHERE id = ?2",
-            (&contraction_time_ms, &id),
+            "UPDATE programs SET contraction_cpu_time_us = ?1, tree_building_time_us = ?2 WHERE id = ?3",
+            (&contraction_time_us, &tree_building_time_us, &id),
         )?;
         Ok(())
     }
