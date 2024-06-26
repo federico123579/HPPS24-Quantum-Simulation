@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS `programs` (
     `id` INTEGER,
     `filename` TEXT NOT NULL,
     `text` TEXT NOT NULL,
+    `contraction_cpu_time_us` INTEGER DEFAULT NULL,
     PRIMARY KEY(`id`)
 );
 CREATE TABLE IF NOT EXISTS `contractions` (

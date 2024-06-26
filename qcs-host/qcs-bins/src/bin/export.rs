@@ -1,5 +1,6 @@
 use std::{
     path::{Path, PathBuf},
+    time::Duration,
     vec::IntoIter,
 };
 
@@ -57,6 +58,7 @@ fn main() -> Result<()> {
         }
 
         let mut blocks = Vec::new();
+        let mut cpu_time = Duration::new(0, 0);
         for node in contracted_nodes {
             match node {
                 TensorKind::Contraction(contr) => {
@@ -64,11 +66,14 @@ fn main() -> Result<()> {
                     let exec = CpuExecutor::new();
                     let start = std::time::Instant::now();
                     blocks.extend(exec.execute(plan));
-                    println!("Time: {:?}", start.elapsed());
+                    cpu_time += start.elapsed();
                 }
                 TensorKind::Gate(g) => blocks.push((*g).spanned_block()),
             }
         }
+
+        // update the program with the contraction time
+        conn.update_contraction_time(program_id, cpu_time.as_micros() as u64)?;
 
         let eval = blocks.into_iter().fold(None, |acc, block| match acc {
             None => Some(block),
@@ -126,6 +131,7 @@ trait QuantumDB {
     fn insert_gate(&self, gate: Gate) -> Result<i64>;
     fn insert_contraction(&self, contr: TensorKind, program_id: i64) -> Result<i64>;
     fn insert_program(&self, program: &Path) -> Result<i64>;
+    fn update_contraction_time(&self, id: i64, contraction_time_ms: u64) -> Result<()>;
     fn insert_experiment(
         &self,
         input: QRegister,
@@ -190,6 +196,14 @@ impl QuantumDB for Connection {
         )?;
         let id = self.last_insert_rowid();
         Ok(id)
+    }
+
+    fn update_contraction_time(&self, id: i64, contraction_time_ms: u64) -> Result<()> {
+        self.execute(
+            "UPDATE programs SET contraction_cpu_time_us = ?1 WHERE id = ?2",
+            (&contraction_time_ms, &id),
+        )?;
+        Ok(())
     }
 
     fn insert_experiment(
