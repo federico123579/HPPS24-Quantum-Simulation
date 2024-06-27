@@ -14,7 +14,7 @@ fn main() {
     println!("Out {}", out);
 
     bfile.add_te(left).unwrap();
-    bfile.add_te(right).unwrap();
+    bfile.add_te(right.column_major()).unwrap();
     bfile.add_matmul(out).unwrap();
 
     println!("Done!");

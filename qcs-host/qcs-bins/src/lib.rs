@@ -32,11 +32,21 @@ impl Serialize for DMatrix<Complex<f64>> {
 pub struct TE {
     pub left: DMatrix<Complex<f64>>,
     pub right: DMatrix<Complex<f64>>,
+    pub column_major: bool,
 }
 
 impl TE {
     pub fn new(left: DMatrix<Complex<f64>>, right: DMatrix<Complex<f64>>) -> Self {
-        Self { left, right }
+        Self {
+            left,
+            right,
+            column_major: false,
+        }
+    }
+
+    pub fn column_major(mut self) -> Self {
+        self.column_major = true;
+        self
     }
 
     pub fn id(size: usize) -> DMatrix<Complex<f64>> {
@@ -72,11 +82,20 @@ impl TE {
 impl Serialize for TE {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
-        bytes.extend_from_slice(&[0u8; 4]); // magic number
-        bytes.extend_from_slice(&self.left.serialize());
-        bytes.extend_from_slice(&self.right.serialize());
-        bytes.extend_from_slice(&self.compute().serialize());
-        bytes
+        bytes.push(0x00); // magic number for TE
+        if !self.column_major {
+            bytes.push(0x00); // magic number for row major
+            bytes.extend_from_slice(&self.left.serialize());
+            bytes.extend_from_slice(&self.right.serialize());
+            bytes.extend_from_slice(&self.compute().serialize());
+            bytes
+        } else {
+            bytes.push(0xff); // magic number for column major
+            bytes.extend_from_slice(&self.left.transpose().serialize());
+            bytes.extend_from_slice(&self.right.transpose().serialize());
+            bytes.extend_from_slice(&self.compute().transpose().serialize());
+            bytes
+        }
     }
 }
 
@@ -111,11 +130,21 @@ impl<G: QuantumGate> TECompatible for G {
 pub struct Matmul {
     pub left: DMatrix<Complex<f64>>,
     pub right: DMatrix<Complex<f64>>,
+    pub column_major: bool,
 }
 
 impl Matmul {
     pub fn new(left: DMatrix<Complex<f64>>, right: DMatrix<Complex<f64>>) -> Self {
-        Self { left, right }
+        Self {
+            left,
+            right,
+            column_major: false,
+        }
+    }
+
+    pub fn column_major(mut self) -> Self {
+        self.column_major = true;
+        self
     }
 
     pub fn compute(&self) -> DMatrix<Complex<f64>> {
@@ -126,11 +155,20 @@ impl Matmul {
 impl Serialize for Matmul {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
-        bytes.extend_from_slice(&[1u8; 4]); // magic number
-        bytes.extend_from_slice(&self.left.serialize());
-        bytes.extend_from_slice(&self.right.transpose().serialize());
-        bytes.extend_from_slice(&self.compute().serialize());
-        bytes
+        bytes.push(0xff); // magic number for matmul
+        if !self.column_major {
+            bytes.push(0x00); // magic number for row major
+            bytes.extend_from_slice(&self.left.serialize());
+            bytes.extend_from_slice(&self.right.transpose().serialize());
+            bytes.extend_from_slice(&self.compute().serialize());
+            bytes
+        } else {
+            bytes.push(0xff); // magic number for column major
+            bytes.extend_from_slice(&self.left.transpose().serialize());
+            bytes.extend_from_slice(&self.right.serialize());
+            bytes.extend_from_slice(&self.compute().transpose().serialize());
+            bytes
+        }
     }
 }
 

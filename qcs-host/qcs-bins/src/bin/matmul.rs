@@ -37,7 +37,7 @@ fn main() {
     let mut bfile = BinFile::new(PathBuf::from("golden-vectors.dat")).unwrap();
 
     for (op, i) in ops.into_iter().zip(0..) {
-        println!("{}: {}", op, i);
+        println!("{}: {}", i, op);
         bfile.add_matmul(op).unwrap();
     }
 
