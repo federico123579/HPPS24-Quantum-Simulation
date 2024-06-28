@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
+    compiler::BinaryFile,
     contractions::{TensorKind, TensorNetwork},
-    executor::CpuExecutor,
+    executor::{CpuExecutor, InstructionLike},
     model::{blocks::BlockLike, gates::QuantumGate, QRegister, Qubit, TensorProduct},
     op_tree,
     scheduler::OperationPlan,
@@ -13,6 +14,20 @@ use qcs_core::{
 #[derive(Debug, Clone, Parser)]
 struct Cli {
     input: PathBuf,
+    output: PathBuf,
+}
+
+fn compile_plan(mut plan: OperationPlan, output: PathBuf) {
+    let mut bfile = BinaryFile::new(output).unwrap();
+    while !plan.is_empty() {
+        let instructions = plan.fetch_ready();
+        let mut dones = Vec::new();
+        for instruction in instructions {
+            bfile.add_operation_instruction(&instruction).unwrap();
+            dones.push(instruction.id());
+        }
+        plan.set_done(dones);
+    }
 }
 
 fn main() {
@@ -31,6 +46,8 @@ fn main() {
                 let opt = op_tree::Operation::from_contraction(*contr, false);
                 let plan = OperationPlan::from(opt);
                 println!("Contraction plan:\n{}", &plan);
+                compile_plan(plan.clone(), args.output.clone());
+                println!("Compiled to binary file {}", args.output.display());
                 let exec = CpuExecutor::new();
                 let start = std::time::Instant::now();
                 blocks.extend(exec.execute(plan));

@@ -161,9 +161,9 @@ impl OperationPlanBuilder {
                     dependencies,
                     kernel: Kernel::TE { left, right: op },
                     left_format: if transposed_op {
-                        SerializeFormat::ColumnMajor
+                        MatrixFormat::ColumnMajor
                     } else {
-                        SerializeFormat::RowMajor
+                        MatrixFormat::RowMajor
                     },
                 };
                 self.instructions.push(first_te);
@@ -176,7 +176,7 @@ impl OperationPlanBuilder {
                     id,
                     dependencies: vec![first_id],
                     kernel: Kernel::TE { left, right },
-                    left_format: SerializeFormat::ColumnMajor,
+                    left_format: MatrixFormat::ColumnMajor,
                 };
                 self.instructions.push(second_te);
                 id
@@ -205,9 +205,9 @@ impl OperationPlanBuilder {
                     dependencies,
                     kernel: Kernel::MM { left, right },
                     left_format: if transposed_op {
-                        SerializeFormat::ColumnMajor
+                        MatrixFormat::ColumnMajor
                     } else {
-                        SerializeFormat::RowMajor
+                        MatrixFormat::RowMajor
                     },
                 };
                 self.instructions.push(mm);
@@ -249,7 +249,7 @@ pub struct OperationInstruction {
     pub id: usize,
     pub dependencies: Vec<usize>,
     pub kernel: Kernel,
-    pub left_format: SerializeFormat,
+    pub left_format: MatrixFormat,
 }
 
 impl Computation for OperationInstruction {
@@ -295,7 +295,7 @@ impl std::fmt::Display for OperationInstruction {
 }
 
 #[derive(Debug, Clone)]
-pub enum SerializeFormat {
+pub enum MatrixFormat {
     ColumnMajor,
     RowMajor,
 }
