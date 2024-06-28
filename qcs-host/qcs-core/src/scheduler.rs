@@ -6,8 +6,6 @@
 //! create a plan of instructions that can be executed in parallel, and will
 //! return the instructions in the order they can be executed.
 
-use std::usize;
-
 use hashbrown::HashMap;
 
 use crate::{
