@@ -4,9 +4,9 @@ use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
-    cpu_scheduler::CPUContractionPlan,
     executor::CpuExecutor,
     model::{gates::QuantumGate, QRegister, Qubit, TensorProduct},
+    scheduler::ContractionPlan,
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -27,7 +27,7 @@ fn main() {
     for node in contracted_nodes {
         match node {
             TensorKind::Contraction(contr) => {
-                let plan = CPUContractionPlan::from(*contr);
+                let plan = ContractionPlan::from(*contr);
                 println!("Contraction plan:\n{}", &plan);
                 let exec = CpuExecutor::new();
                 let start = std::time::Instant::now();

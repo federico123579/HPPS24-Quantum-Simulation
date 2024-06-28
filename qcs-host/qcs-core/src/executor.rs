@@ -10,8 +10,8 @@ use crossbeam::channel::unbounded;
 use dashmap::{DashMap, DashSet};
 
 use crate::{
-    cpu_scheduler::{CPUContractionPlan, CPUInstruction, CPUInstructionOperand},
     model::blocks::SpannedBlock,
+    scheduler::contraction::{ContractionInstruction, ContractionOperand, ContractionPlan},
 };
 
 /// The `CpuExecutor` is responsible for executing the instructions on the CPU.
@@ -23,18 +23,18 @@ pub struct CpuExecutor {
 }
 
 trait BlockStore {
-    fn load_block(&self, operand: CPUInstructionOperand) -> SpannedBlock;
+    fn load_block(&self, operand: ContractionOperand) -> SpannedBlock;
     fn save_block(&self, id: usize, block: SpannedBlock);
-    fn prepare_computation(&self, instruction: CPUInstruction) -> Computation;
+    fn prepare_computation(&self, instruction: ContractionInstruction) -> Computation;
 }
 
 impl BlockStore for DashMap<usize, SpannedBlock> {
     /// Loads a block from memory or from the instruction.
     #[inline]
-    fn load_block(&self, instruction: CPUInstructionOperand) -> SpannedBlock {
+    fn load_block(&self, instruction: ContractionOperand) -> SpannedBlock {
         match instruction {
-            CPUInstructionOperand::Gate(gate) => gate.into(),
-            CPUInstructionOperand::Address(address) => self.remove(&address).unwrap().1,
+            ContractionOperand::Gate(gate) => gate.into(),
+            ContractionOperand::Address(address) => self.remove(&address).unwrap().1,
         }
     }
 
@@ -45,8 +45,8 @@ impl BlockStore for DashMap<usize, SpannedBlock> {
     }
 
     /// Prepare the execution of a single instruction.
-    fn prepare_computation(&self, instruction: CPUInstruction) -> Computation {
-        let CPUInstruction {
+    fn prepare_computation(&self, instruction: ContractionInstruction) -> Computation {
+        let ContractionInstruction {
             id, first, second, ..
         } = instruction;
 
@@ -86,7 +86,7 @@ impl CpuExecutor {
     }
 
     /// Execute a contraction plan, in parallel.
-    pub fn execute(mut self, mut plan: CPUContractionPlan) -> Vec<SpannedBlock> {
+    pub fn execute(mut self, mut plan: ContractionPlan) -> Vec<SpannedBlock> {
         // create a channel to communicate the need of more instructions
         let (wtx, wrx) = unbounded();
         let (itx, irx) = unbounded();

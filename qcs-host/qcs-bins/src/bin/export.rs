@@ -8,13 +8,13 @@ use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
-    cpu_scheduler::CPUContractionPlan,
     executor::CpuExecutor,
     model::{
         blocks::Block,
         gates::{Gate, QuantumGate},
         QRegister, Qubit, TensorProduct,
     },
+    scheduler::ContractionPlan,
 };
 use rusqlite::{Connection, Result};
 use tracing::{debug, info, instrument, trace};
@@ -94,7 +94,7 @@ fn main() -> Result<()> {
         for node in contracted_nodes {
             match node {
                 TensorKind::Contraction(contr) => {
-                    let plan = CPUContractionPlan::from(*contr);
+                    let plan = ContractionPlan::from(*contr);
                     let exec = CpuExecutor::new();
                     debug!("Starting contraction");
                     let start = std::time::Instant::now();

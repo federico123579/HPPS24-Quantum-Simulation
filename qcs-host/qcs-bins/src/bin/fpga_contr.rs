@@ -4,9 +4,9 @@ use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
-    fpga_scheduler::FPGAContractionPlan,
     model::gates::QuantumGate,
     op_tree,
+    scheduler::OperationPlan,
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -28,7 +28,7 @@ fn main() {
         match node {
             TensorKind::Contraction(contr) => {
                 let opt = op_tree::Operation::from_contraction(*contr, false);
-                let plan = FPGAContractionPlan::from(opt);
+                let plan = OperationPlan::from(opt);
                 println!("Contraction plan:\n{}", &plan);
             }
             TensorKind::Gate(g) => blocks.push((*g).spanned_block()),

@@ -15,16 +15,16 @@ use crate::{model::gates::QuantumGate, op_tree};
 /// The plan is a list of instructions that can be executed in parallel
 /// and the dependencies between them.
 #[derive(Debug, Clone)]
-pub struct FPGAContractionPlan {
+pub struct OperationPlan {
     /// The instructions to be executed.
-    instructions: HashMap<usize, FPGAInstruction>,
+    instructions: HashMap<usize, OperationInstruction>,
     /// The dependencies of each instruction.
     waiting_dep: HashMap<usize, Vec<usize>>,
     /// The dependants of each instruction.
     dependants: HashMap<usize, Vec<usize>>,
 }
 
-impl FPGAContractionPlan {
+impl OperationPlan {
     /// Extract the instructions that are ready to be executed, these are the
     /// instructions that have no dependencies.
     fn get_ready(&self) -> Vec<usize> {
@@ -52,7 +52,7 @@ impl FPGAContractionPlan {
 
     /// Fetch the instructions that are ready to be executed.
     /// The instructions are removed from the plan.
-    pub fn fetch_ready(&mut self) -> Vec<FPGAInstruction> {
+    pub fn fetch_ready(&mut self) -> Vec<OperationInstruction> {
         let ready = self.get_ready();
         ready
             .iter()
@@ -66,15 +66,15 @@ impl FPGAContractionPlan {
     }
 }
 
-impl From<op_tree::Operation> for FPGAContractionPlan {
+impl From<op_tree::Operation> for OperationPlan {
     fn from(value: op_tree::Operation) -> Self {
-        let mut builder = FPGAComputationPlanBuilder::default();
-        builder.populate_with_op(value);
+        let mut builder = OperationPlanBuilder::default();
+        builder.populate(value);
         builder.build()
     }
 }
 
-impl std::fmt::Display for FPGAContractionPlan {
+impl std::fmt::Display for OperationPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Instructions:")?;
         for (_, instr) in &self.instructions {
@@ -93,19 +93,19 @@ impl std::fmt::Display for FPGAContractionPlan {
 }
 
 #[derive(Default)]
-struct FPGAComputationPlanBuilder {
+struct OperationPlanBuilder {
     next_available_id: usize,
-    instructions: Vec<FPGAInstruction>,
+    instructions: Vec<OperationInstruction>,
 }
 
-impl FPGAComputationPlanBuilder {
+impl OperationPlanBuilder {
     fn new_id(&mut self) -> usize {
         let id = self.next_available_id;
         self.next_available_id += 1;
         id
     }
 
-    fn populate_with_op(&mut self, operation: op_tree::Operation) -> usize {
+    fn populate(&mut self, operation: op_tree::Operation) -> usize {
         let op_tree::Operation {
             inner,
             transposed_op,
@@ -119,7 +119,7 @@ impl FPGAComputationPlanBuilder {
                 let op_span = operand.span();
                 let op = match operand {
                     op_tree::Operand::Operation(op) => {
-                        let dep = self.populate_with_op(*op);
+                        let dep = self.populate(*op);
                         dependencies.push(dep);
                         KernelOperand::Address(dep)
                     }
@@ -130,7 +130,7 @@ impl FPGAComputationPlanBuilder {
                 let id_matrix = DMatrix::identity(id_dim, id_dim);
                 let left = KernelOperand::from(id_matrix);
                 let id = self.new_id();
-                let first_te = FPGAInstruction {
+                let first_te = OperationInstruction {
                     id,
                     dependencies,
                     kernel: Kernel::TE { left, right: op },
@@ -147,7 +147,7 @@ impl FPGAComputationPlanBuilder {
                 let id_matrix = DMatrix::identity(id_dim, id_dim);
                 let right = KernelOperand::from(id_matrix);
                 let id = self.new_id();
-                let second_te = FPGAInstruction {
+                let second_te = OperationInstruction {
                     id,
                     dependencies: vec![id],
                     kernel: Kernel::TE { left, right },
@@ -160,7 +160,7 @@ impl FPGAComputationPlanBuilder {
                 let mut dependencies = Vec::new();
                 let left = match left {
                     op_tree::Operand::Operation(op) => {
-                        let dep = self.populate_with_op(*op);
+                        let dep = self.populate(*op);
                         dependencies.push(dep);
                         KernelOperand::Address(dep)
                     }
@@ -168,14 +168,14 @@ impl FPGAComputationPlanBuilder {
                 };
                 let right = match right {
                     op_tree::Operand::Operation(op) => {
-                        let dep = self.populate_with_op(*op);
+                        let dep = self.populate(*op);
                         dependencies.push(dep);
                         KernelOperand::Address(dep)
                     }
                     op_tree::Operand::Gate(gate) => KernelOperand::from(gate.as_ref().matrix()),
                 };
                 let id = self.new_id();
-                let mm = FPGAInstruction {
+                let mm = OperationInstruction {
                     id,
                     dependencies,
                     kernel: Kernel::MM { left, right },
@@ -192,7 +192,7 @@ impl FPGAComputationPlanBuilder {
         address
     }
 
-    fn build(self) -> FPGAContractionPlan {
+    fn build(self) -> OperationPlan {
         let instructions = self
             .instructions
             .into_iter()
@@ -212,7 +212,7 @@ impl FPGAComputationPlanBuilder {
             }
             dependants
         };
-        FPGAContractionPlan {
+        OperationPlan {
             instructions,
             waiting_dep,
             dependants,
@@ -221,22 +221,22 @@ impl FPGAComputationPlanBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct FPGAInstruction {
+pub struct OperationInstruction {
     pub id: usize,
     pub dependencies: Vec<usize>,
     pub kernel: Kernel,
     pub left_format: SerializeFormat,
 }
 
-impl PartialEq for FPGAInstruction {
+impl PartialEq for OperationInstruction {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl Eq for FPGAInstruction {}
+impl Eq for OperationInstruction {}
 
-impl std::fmt::Display for FPGAInstruction {
+impl std::fmt::Display for OperationInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:03}: {}", self.id, self.kernel)
     }
