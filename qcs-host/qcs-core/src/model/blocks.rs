@@ -191,7 +191,7 @@ impl SpannedBlock {
 
     /// Returns the span that a contraction with another `SpannedBlock` would cover.
     pub fn merged_span(&self, rhs: &SpannedBlock) -> Span {
-        self.span.full_join(&rhs.span)
+        self.span.union(&rhs.span)
     }
 
     /// Adapts the span of the block to a new span, making tensor products
@@ -235,7 +235,7 @@ impl TensorProduct for SpannedBlock {
         let rhs = rhs.into();
         SpannedBlock {
             block: self.block.tensor_product(rhs.block),
-            span: self.span.full_join(&rhs.span),
+            span: self.span.union(&rhs.span),
         }
     }
 }
@@ -247,7 +247,7 @@ impl Mul<&SpannedBlock> for &SpannedBlock {
         assert_eq!(self.span, rhs.span, "Incompatible spans");
         SpannedBlock {
             block: &self.block * &rhs.block,
-            span: self.span.full_join(&rhs.span),
+            span: self.span.union(&rhs.span),
         }
     }
 }
@@ -259,7 +259,7 @@ impl Mul<SpannedBlock> for SpannedBlock {
         assert_eq!(self.span, rhs.span, "Incompatible spans");
         SpannedBlock {
             block: &self.block * &rhs.block,
-            span: self.span.full_join(&rhs.span),
+            span: self.span.union(&rhs.span),
         }
     }
 }

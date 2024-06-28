@@ -38,7 +38,7 @@ fn main() {
 
     for (op, i) in ops.into_iter().zip(0..) {
         println!("{}: {}", i, op);
-        bfile.add_matmul(op).unwrap();
+        bfile.add(op).unwrap();
     }
 
     println!("Done!");

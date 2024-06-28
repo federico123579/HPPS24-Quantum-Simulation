@@ -75,7 +75,7 @@ impl TensorNetwork {
             .filter(|e| {
                 let source = self.graph.node_weight(e.source()).unwrap().span().filled();
                 let target = self.graph.node_weight(e.target()).unwrap().span().filled();
-                let max_span = source.inner_join(&target).unwrap();
+                let max_span = source.intersection(&target).unwrap();
                 e.weight() == &max_span
             })
             .collect()
@@ -94,7 +94,7 @@ impl TensorNetwork {
             .for_each(|(n, s)| {
                 let span = backlinks
                     .remove(&n)
-                    .map(|ms: Span| ms.full_join(&s))
+                    .map(|ms: Span| ms.union(&s))
                     .unwrap_or_else(|| s.clone());
                 backlinks.insert(n, span);
             });
@@ -107,7 +107,7 @@ impl TensorNetwork {
             .for_each(|(n, s)| {
                 let span = frontlinks
                     .remove(&n)
-                    .map(|ms: Span| ms.full_join(&s))
+                    .map(|ms: Span| ms.union(&s))
                     .unwrap_or_else(|| s.clone());
                 frontlinks.insert(n, span);
             });
@@ -129,7 +129,7 @@ impl TensorNetwork {
     pub fn contraction_rank(&self, edge: &EdgeReference<Span>) -> u8 {
         let source = self.graph.node_weight(edge.source()).unwrap();
         let target = self.graph.node_weight(edge.target()).unwrap();
-        source.span().full_join(&target.span()).span_len() as u8
+        source.span().union(&target.span()).span_len() as u8
     }
 }
 
@@ -215,7 +215,7 @@ pub struct TensorContraction {
 impl TensorContraction {
     /// Create a new tensor contraction.
     pub fn new(left: TensorKind, right: TensorKind) -> Self {
-        let span = left.span().full_join(&right.span());
+        let span = left.span().union(&right.span());
         let rank = span.span_len() as u8;
         Self {
             rank,

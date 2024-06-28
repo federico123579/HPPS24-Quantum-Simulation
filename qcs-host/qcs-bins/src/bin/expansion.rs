@@ -44,19 +44,19 @@ fn main() {
     for (gate, i) in gates.into_iter().zip(0..) {
         let te1 = gate.left_te(1);
         println!("{}: {}", i * 4, te1);
-        bfile.add_te(te1).unwrap();
+        bfile.add(te1).unwrap();
 
         let te2 = gate.left_te(2);
         println!("{}: {}", i * 4 + 1, te2);
-        bfile.add_te(te2).unwrap();
+        bfile.add(te2).unwrap();
 
         let te3 = gate.right_te(1);
         println!("{}: {}", i * 4 + 2, te3);
-        bfile.add_te(te3).unwrap();
+        bfile.add(te3).unwrap();
 
         let te4 = gate.right_te(2);
         println!("{}: {}", i * 4 + 3, te4);
-        bfile.add_te(te4).unwrap();
+        bfile.add(te4).unwrap();
     }
 
     println!("Done!");

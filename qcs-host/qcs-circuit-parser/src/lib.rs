@@ -31,7 +31,7 @@ fn parse_textual_program(filename: impl AsRef<Path>) -> Result<QuantumCircuit, O
 
     let total_span = gates
         .iter()
-        .fold(Span::range(0..0), |acc, g| acc.full_join(&g.span()));
+        .fold(Span::range(0..0), |acc, g| acc.union(&g.span()));
     let mut circ = QuantumCircuit::new(total_span.span_len());
     gates.into_iter().for_each(|g| circ.push_gate(g));
     Ok(circ)

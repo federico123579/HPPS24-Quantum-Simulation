@@ -17,16 +17,16 @@ use crate::{
 /// The plan is a list of instructions that can be executed in parallel
 /// and the dependencies between them.
 #[derive(Debug, Clone)]
-pub struct ContractionPlan {
+pub struct CPUContractionPlan {
     /// The instructions to be executed.
-    instructions: HashMap<usize, Instruction>,
+    instructions: HashMap<usize, CPUInstruction>,
     /// The dependencies of each instruction.
     waiting_dep: HashMap<usize, Vec<usize>>,
     /// The dependants of each instruction.
     dependants: HashMap<usize, Vec<usize>>,
 }
 
-impl ContractionPlan {
+impl CPUContractionPlan {
     /// Extract the instructions that are ready to be executed, these are the
     /// instructions that have no dependencies.
     fn get_ready(&self) -> Vec<usize> {
@@ -54,7 +54,7 @@ impl ContractionPlan {
 
     /// Fetch the instructions that are ready to be executed.
     /// The instructions are removed from the plan.
-    pub fn fetch_ready(&mut self) -> Vec<Instruction> {
+    pub fn fetch_ready(&mut self) -> Vec<CPUInstruction> {
         let ready = self.get_ready();
         ready
             .iter()
@@ -68,9 +68,9 @@ impl ContractionPlan {
     }
 }
 
-impl From<TensorContraction> for ContractionPlan {
+impl From<TensorContraction> for CPUContractionPlan {
     fn from(contraction: TensorContraction) -> Self {
-        let (instruction, collaterals) = Instruction::from_contraction(0, contraction, vec![]);
+        let (instruction, collaterals) = CPUInstruction::from_contraction(0, contraction, vec![]);
 
         let instructions: HashMap<_, _> = collaterals
             .into_iter()
@@ -100,7 +100,7 @@ impl From<TensorContraction> for ContractionPlan {
     }
 }
 
-impl std::fmt::Display for ContractionPlan {
+impl std::fmt::Display for CPUContractionPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Instructions:")?;
         for (_, instr) in &self.instructions {
@@ -122,7 +122,7 @@ impl std::fmt::Display for ContractionPlan {
 /// The instruction is a tensor contraction to be executed in the simulator
 /// and the dependencies of the instruction.
 #[derive(Debug, Clone)]
-pub struct Instruction {
+pub struct CPUInstruction {
     /// The id of the instruction
     pub id: usize,
     /// The dependencies on which this instruction depends
@@ -130,12 +130,12 @@ pub struct Instruction {
     /// The rank of the resulting tensor
     pub rank: u8,
     /// The left operand of the instruction
-    pub first: InstructionOperand,
+    pub first: CPUInstructionOperand,
     /// The right operand of the instruction
-    pub second: InstructionOperand,
+    pub second: CPUInstructionOperand,
 }
 
-impl Instruction {
+impl CPUInstruction {
     /// Create an instruction from a tensor contraction
     /// The instruction will be created recursively from the tensor contraction
     /// and the collaterals will be returned as well.
@@ -146,7 +146,7 @@ impl Instruction {
     fn from_contraction(
         id: usize,
         contr: TensorContraction,
-        collaterals: Vec<Instruction>,
+        collaterals: Vec<CPUInstruction>,
     ) -> (Self, Vec<Self>) {
         let mut collaterals = collaterals;
         let mut available_id = id + 1;
@@ -167,9 +167,9 @@ impl Instruction {
                 dependencies.push(instr_id);
                 collaterals.push(instr);
                 available_id = collaterals.iter().map(|i| i.id).max().unwrap() + 1;
-                InstructionOperand::from(instr_id)
+                CPUInstructionOperand::from(instr_id)
             }
-            TensorKind::Gate(gate) => InstructionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => CPUInstructionOperand::Gate(*gate),
         };
 
         let second = match right {
@@ -179,9 +179,9 @@ impl Instruction {
                 let instr_id = instr.id;
                 dependencies.push(instr_id);
                 collaterals.push(instr);
-                InstructionOperand::from(instr_id)
+                CPUInstructionOperand::from(instr_id)
             }
-            TensorKind::Gate(gate) => InstructionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => CPUInstructionOperand::Gate(*gate),
         };
 
         let instruction = Self {
@@ -201,15 +201,15 @@ impl Instruction {
     }
 }
 
-impl PartialEq for Instruction {
+impl PartialEq for CPUInstruction {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl Eq for Instruction {}
+impl Eq for CPUInstruction {}
 
-impl std::fmt::Display for Instruction {
+impl std::fmt::Display for CPUInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -223,26 +223,26 @@ impl std::fmt::Display for Instruction {
 /// The operand can be a gate or an address in the plan (the id of the
 /// instruction).
 #[derive(Debug, Clone)]
-pub enum InstructionOperand {
+pub enum CPUInstructionOperand {
     /// A gate to be executed
     Gate(Gate),
     /// An blocj id in the plan
     Address(usize),
 }
 
-impl From<Gate> for InstructionOperand {
+impl From<Gate> for CPUInstructionOperand {
     fn from(gate: Gate) -> Self {
         Self::Gate(gate)
     }
 }
 
-impl From<usize> for InstructionOperand {
+impl From<usize> for CPUInstructionOperand {
     fn from(id: usize) -> Self {
         Self::Address(id)
     }
 }
 
-impl std::fmt::Display for InstructionOperand {
+impl std::fmt::Display for CPUInstructionOperand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::Gate(gate) => write!(f, "g:{}", gate),

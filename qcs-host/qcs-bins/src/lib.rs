@@ -13,7 +13,7 @@ fn count_non_zero(matrix: &DMatrix<Complex<f64>>) -> usize {
         .fold(0, |a, b| if b.norm() > 1e-6 { a + 1 } else { a })
 }
 
-trait Serialize {
+pub trait Serialize {
     fn serialize(&self) -> Vec<u8>;
 }
 
@@ -111,8 +111,7 @@ impl std::fmt::Display for TE {
     }
 }
 
-pub trait TECompatible {
-    fn as_matrix(&self) -> DMatrix<Complex<f64>>;
+pub trait TECompatible: MatrixCompatible {
     fn left_te(&self, id_size: usize) -> TE {
         TE::with_left_id(id_size, self.as_matrix())
     }
@@ -121,11 +120,7 @@ pub trait TECompatible {
     }
 }
 
-impl<G: QuantumGate> TECompatible for G {
-    fn as_matrix(&self) -> DMatrix<Complex<f64>> {
-        self.matrix()
-    }
-}
+impl<G: QuantumGate> TECompatible for G {}
 
 pub struct Matmul {
     pub left: DMatrix<Complex<f64>>,
@@ -212,11 +207,18 @@ impl BinFile {
         })
     }
 
-    pub fn add_te(&mut self, te: TE) -> std::io::Result<()> {
-        self.file.write_all(&te.serialize())
-    }
-
-    pub fn add_matmul(&mut self, op: Matmul) -> std::io::Result<()> {
-        self.file.write_all(&op.serialize())
+    pub fn add(&mut self, ser: impl Serialize) -> std::io::Result<()> {
+        self.file.write_all(&ser.serialize())
     }
 }
+
+// impl Serialize for Instruction {
+//     fn serialize(&self) -> Vec<u8> {
+//         let mut bytes = vec![];
+//         bytes.extend_from_slice(&self.id.to_le_bytes());
+
+//         bytes.extend_from_slice(&self.first.serialize());
+//         bytes.extend_from_slice(&self.second.serialize());
+//         bytes
+//     }
+// }

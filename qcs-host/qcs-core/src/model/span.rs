@@ -82,15 +82,15 @@ impl Span {
         self.0.contains(&value)
     }
 
-    /// Returns the full join of two spans.
+    /// Returns the union of two spans.
     /// ```
     /// # use qcs_core::model::span::Span;
     /// let a = Span::new([0, 1, 2, 3]);
     /// let b = Span::new([2, 3, 4, 5]);
-    /// // The full join of A and B is [0, 1, 2, 3, 4, 5]
-    /// assert_eq!(a.full_join(&b), Span::new([0, 1, 2, 3, 4, 5]))
+    /// // The union of A and B is [0, 1, 2, 3, 4, 5]
+    /// assert_eq!(a.union(&b), Span::new([0, 1, 2, 3, 4, 5]))
     /// ```
-    pub fn full_join(&self, other: &Self) -> Self {
+    pub fn union(&self, other: &Self) -> Self {
         let mut self_iter = self.0.iter().peekable();
         let mut other_iter = other.0.iter().peekable();
         let mut result = Vec::new();
@@ -122,15 +122,15 @@ impl Span {
         Self(result)
     }
 
-    /// Returns the inner join of two spans.
+    /// Returns the intersection of two spans.
     /// ```
     /// # use qcs_core::model::span::Span;
     /// let a = Span::new([0, 1, 2, 3]);
     /// let b = Span::new([2, 3, 4, 5]);
-    /// // The inner join of A and B is [2, 3]
-    /// assert_eq!(a.inner_join(&b).unwrap(), Span::new([2, 3]))
+    /// // The intersection of A and B is [2, 3]
+    /// assert_eq!(a.intersection(&b).unwrap(), Span::new([2, 3]))
     /// ```
-    pub fn inner_join(&self, other: &Self) -> Option<Self> {
+    pub fn intersection(&self, other: &Self) -> Option<Self> {
         let mut self_iter = self.0.iter().peekable();
         let mut other_iter = other.0.iter().peekable();
         let mut result = Vec::new();
@@ -163,10 +163,10 @@ impl Span {
     /// # use qcs_core::model::span::Span;
     /// let a = Span::new([0, 1, 2, 3]);
     /// let b = Span::new([2, 3, 4, 5]);
-    /// // The exclusion of A and B is [0, 1]
-    /// assert_eq!(a.exclude(&b).unwrap(), Span::new([0, 1]))
+    /// // The difference of A and B is [0, 1]
+    /// assert_eq!(a.difference(&b).unwrap(), Span::new([0, 1]))
     /// ```
-    pub fn exclude(self, other: &Self) -> Option<Self> {
+    pub fn difference(self, other: &Self) -> Option<Self> {
         let self_iter = self.0.into_iter();
         let mut result = Vec::new();
 
@@ -254,7 +254,7 @@ impl<T: Clone> GateSliceView<T> {
             .spans
             .clone()
             .into_iter()
-            .filter_map(|(s, v)| Some((s.exclude(&span.filled())?, v)))
+            .filter_map(|(s, v)| Some((s.difference(&span.filled())?, v)))
             .chain(once((span.filled(), value)))
             .collect();
     }
@@ -263,7 +263,7 @@ impl<T: Clone> GateSliceView<T> {
     pub fn get(&self, span: &Span) -> Vec<(Span, T)> {
         self.spans
             .iter()
-            .filter_map(|(s, v)| Some((s.inner_join(span)?, v.clone())))
+            .filter_map(|(s, v)| Some((s.intersection(span)?, v.clone())))
             .collect()
     }
 }

@@ -10,8 +10,8 @@ use crossbeam::channel::unbounded;
 use dashmap::{DashMap, DashSet};
 
 use crate::{
+    cpu_scheduler::{CPUContractionPlan, CPUInstruction, CPUInstructionOperand},
     model::blocks::SpannedBlock,
-    scheduler::{ContractionPlan, Instruction, InstructionOperand},
 };
 
 /// The `CpuExecutor` is responsible for executing the instructions on the CPU.
@@ -23,18 +23,18 @@ pub struct CpuExecutor {
 }
 
 trait BlockStore {
-    fn load_block(&self, operand: InstructionOperand) -> SpannedBlock;
+    fn load_block(&self, operand: CPUInstructionOperand) -> SpannedBlock;
     fn save_block(&self, id: usize, block: SpannedBlock);
-    fn prepare_computation(&self, instruction: Instruction) -> Computation;
+    fn prepare_computation(&self, instruction: CPUInstruction) -> Computation;
 }
 
 impl BlockStore for DashMap<usize, SpannedBlock> {
     /// Loads a block from memory or from the instruction.
     #[inline]
-    fn load_block(&self, instruction: InstructionOperand) -> SpannedBlock {
+    fn load_block(&self, instruction: CPUInstructionOperand) -> SpannedBlock {
         match instruction {
-            InstructionOperand::Gate(gate) => gate.into(),
-            InstructionOperand::Address(address) => self.remove(&address).unwrap().1,
+            CPUInstructionOperand::Gate(gate) => gate.into(),
+            CPUInstructionOperand::Address(address) => self.remove(&address).unwrap().1,
         }
     }
 
@@ -45,8 +45,8 @@ impl BlockStore for DashMap<usize, SpannedBlock> {
     }
 
     /// Prepare the execution of a single instruction.
-    fn prepare_computation(&self, instruction: Instruction) -> Computation {
-        let Instruction {
+    fn prepare_computation(&self, instruction: CPUInstruction) -> Computation {
+        let CPUInstruction {
             id, first, second, ..
         } = instruction;
 
@@ -86,7 +86,7 @@ impl CpuExecutor {
     }
 
     /// Execute a contraction plan, in parallel.
-    pub fn execute(mut self, mut plan: ContractionPlan) -> Vec<SpannedBlock> {
+    pub fn execute(mut self, mut plan: CPUContractionPlan) -> Vec<SpannedBlock> {
         // create a channel to communicate the need of more instructions
         let (wtx, wrx) = unbounded();
         let (itx, irx) = unbounded();

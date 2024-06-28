@@ -4,9 +4,9 @@ use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
+    cpu_scheduler::CPUContractionPlan,
     executor::CpuExecutor,
     model::{gates::QuantumGate, QRegister, Qubit, TensorProduct},
-    scheduler::ContractionPlan,
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -19,6 +19,7 @@ fn main() {
     let circuit = parse_program(args.input).unwrap();
 
     let tensor_net = TensorNetwork::from(circuit.clone());
+    println!("Tensor Network:\n{}", tensor_net);
     let contracted_nodes = tensor_net.contract().into_iter();
 
     let mut blocks = Vec::new();
@@ -26,12 +27,12 @@ fn main() {
     for node in contracted_nodes {
         match node {
             TensorKind::Contraction(contr) => {
-                let plan = ContractionPlan::from(*contr);
-                println!("{}", &plan);
+                let plan = CPUContractionPlan::from(*contr);
+                println!("Contraction plan:\n{}", &plan);
                 let exec = CpuExecutor::new();
                 let start = std::time::Instant::now();
                 blocks.extend(exec.execute(plan));
-                println!("Time: {:?}", start.elapsed());
+                println!("CPU Execution Time: {:?}", start.elapsed());
             }
             TensorKind::Gate(g) => blocks.push((*g).spanned_block()),
         }

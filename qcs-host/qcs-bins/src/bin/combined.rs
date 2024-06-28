@@ -13,9 +13,9 @@ fn main() {
     let out = Matmul::new(left.compute(), right.compute());
     println!("Out {}", out);
 
-    bfile.add_te(left).unwrap();
-    bfile.add_te(right.column_major()).unwrap();
-    bfile.add_matmul(out).unwrap();
+    bfile.add(left).unwrap();
+    bfile.add(right.column_major()).unwrap();
+    bfile.add(out).unwrap();
 
     println!("Done!");
 }

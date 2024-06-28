@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
     contractions::{TensorKind, TensorNetwork},
+    cpu_scheduler::CPUContractionPlan,
     executor::CpuExecutor,
     model::{blocks::Block, gates::QuantumGate, QRegister, QuantumCircuit, Qubit, TensorProduct},
-    scheduler::ContractionPlan,
 };
 
 macro_rules! test_circuit {
@@ -68,7 +68,7 @@ fn contract(circuit: &QuantumCircuit) -> Result<Block> {
     for node in contracted_nodes {
         match node {
             TensorKind::Contraction(contr) => {
-                let mut plan = ContractionPlan::from(*contr);
+                let mut plan = CPUContractionPlan::from(*contr);
                 let plan_clone = plan.clone();
                 println!("{}", plan);
 
