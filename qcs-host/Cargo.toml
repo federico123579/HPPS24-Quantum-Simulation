@@ -1,3 +1,6 @@
 [workspace]
-members = [ "qcs-bins", "qcs-circuit-parser","qcs-core"]
+members = ["qcs-bins", "qcs-circuit-parser", "qcs-core"]
 resolver = "2"
+
+[workspace.dependencies]
+nalgebra = "0.32.6"

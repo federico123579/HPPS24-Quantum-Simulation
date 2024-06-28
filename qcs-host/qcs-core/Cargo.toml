@@ -10,7 +10,7 @@ crossbeam = { version = "0.8.4", features = ["crossbeam-channel"] }
 dashmap = "5.5.3"
 enum_dispatch = "0.3.13"
 hashbrown = "0.14.3"
-nalgebra = "0.32.5"
+nalgebra.workspace = true
 num-complex = "0.4.5"
 num_cpus = "1.16.0"
 petgraph = "0.6.4"
