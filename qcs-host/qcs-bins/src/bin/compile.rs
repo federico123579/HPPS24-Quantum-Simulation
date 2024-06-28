@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use qcs_circuit_parser::parse_program;
 use qcs_core::{
-    compiler::BinaryFile,
+    compiler::QcfFile,
     contractions::{TensorKind, TensorNetwork},
     executor::{CpuExecutor, InstructionLike},
     model::{blocks::BlockLike, gates::QuantumGate, QRegister, Qubit, TensorProduct},
@@ -18,7 +18,7 @@ struct Cli {
 }
 
 fn compile_plan(mut plan: OperationPlan, output: PathBuf) {
-    let mut bfile = BinaryFile::new(output).unwrap();
+    let mut bfile = QcfFile::new(output).unwrap();
     while !plan.is_empty() {
         let instructions = plan.fetch_ready();
         let mut dones = Vec::new();

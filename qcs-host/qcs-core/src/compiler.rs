@@ -15,11 +15,11 @@ use nalgebra::{Complex, DMatrix, Normed};
 
 const ZERO_THRESHOLD: f64 = 1e-10;
 
-pub struct BinaryConfig {
+pub struct QcfConfig {
     matrix_format: MatrixFormat,
 }
 
-impl BinaryConfig {
+impl QcfConfig {
     pub fn column_major() -> Self {
         Self {
             matrix_format: MatrixFormat::ColumnMajor,
@@ -40,7 +40,7 @@ impl BinaryConfig {
     }
 }
 
-impl Default for BinaryConfig {
+impl Default for QcfConfig {
     fn default() -> Self {
         Self {
             matrix_format: MatrixFormat::RowMajor,
@@ -48,8 +48,9 @@ impl Default for BinaryConfig {
     }
 }
 
-pub trait ToBinary {
-    fn to_binary(&self, config: &BinaryConfig) -> Vec<u8>;
+/// Quatum Computation Format
+pub trait ToQcf {
+    fn to_qcf(&self, config: &QcfConfig) -> Vec<u8>;
 }
 
 fn count_non_zero(matrix: &DMatrix<Complex<f64>>) -> usize {
@@ -65,8 +66,8 @@ fn count_non_zero(matrix: &DMatrix<Complex<f64>>) -> usize {
 ///     - 4 bytes: column index (u32)
 ///     - 8 bytes: real part (f64)
 ///     - 8 bytes: imaginary part (f64)
-impl ToBinary for DMatrix<Complex<f64>> {
-    fn to_binary(&self, config: &BinaryConfig) -> Vec<u8> {
+impl ToQcf for DMatrix<Complex<f64>> {
+    fn to_qcf(&self, config: &QcfConfig) -> Vec<u8> {
         let mut bytes = vec![];
         bytes.extend_from_slice(&(count_non_zero(self) as u32).to_le_bytes());
         match config.matrix_format {
@@ -101,9 +102,9 @@ impl ToBinary for DMatrix<Complex<f64>> {
     }
 }
 
-impl ToBinary for Block {
-    fn to_binary(&self, config: &BinaryConfig) -> Vec<u8> {
-        self.as_ref().to_binary(config)
+impl ToQcf for Block {
+    fn to_qcf(&self, config: &QcfConfig) -> Vec<u8> {
+        self.as_ref().to_qcf(config)
     }
 }
 
@@ -128,8 +129,8 @@ impl ToBinary for Block {
 ///     - matrix in sparse COO format
 ///   - if kind is operation:
 ///     - 4 bytes: id of operation (u32)
-impl ToBinary for OperationInstruction {
-    fn to_binary(&self, _: &BinaryConfig) -> Vec<u8> {
+impl ToQcf for OperationInstruction {
+    fn to_qcf(&self, _: &QcfConfig) -> Vec<u8> {
         let mut bytes = Vec::new();
         let OperationInstruction {
             id,
@@ -137,7 +138,7 @@ impl ToBinary for OperationInstruction {
             left_format,
             ..
         } = self;
-        let config = BinaryConfig {
+        let config = QcfConfig {
             matrix_format: left_format.to_owned(),
         };
         bytes.extend((*id as u32).to_le_bytes());
@@ -145,18 +146,18 @@ impl ToBinary for OperationInstruction {
             Kernel::TE { left, right } => match (left, right) {
                 (ExecutionOperand::Block(b1), ExecutionOperand::Block(b2)) => {
                     bytes.push(0x00);
-                    bytes.extend(b1.to_binary(&config));
-                    bytes.extend(b2.to_binary(&config));
+                    bytes.extend(b1.to_qcf(&config));
+                    bytes.extend(b2.to_qcf(&config));
                 }
                 (ExecutionOperand::Block(b1), ExecutionOperand::Address(a2)) => {
                     bytes.push(0x01);
-                    bytes.extend(b1.to_binary(&config));
+                    bytes.extend(b1.to_qcf(&config));
                     bytes.extend((*a2 as u32).to_le_bytes());
                 }
                 (ExecutionOperand::Address(a1), ExecutionOperand::Block(b2)) => {
                     bytes.push(0x02);
                     bytes.extend((*a1 as u32).to_le_bytes());
-                    bytes.extend(b2.to_binary(&config));
+                    bytes.extend(b2.to_qcf(&config));
                 }
                 (ExecutionOperand::Address(a1), ExecutionOperand::Address(a2)) => {
                     bytes.push(0x03);
@@ -167,18 +168,18 @@ impl ToBinary for OperationInstruction {
             Kernel::MM { left, right } => match (left, right) {
                 (ExecutionOperand::Block(b1), ExecutionOperand::Block(b2)) => {
                     bytes.push(0x04);
-                    bytes.extend(b1.to_binary(&config));
-                    bytes.extend(b2.to_binary(&config.invert()));
+                    bytes.extend(b1.to_qcf(&config));
+                    bytes.extend(b2.to_qcf(&config.invert()));
                 }
                 (ExecutionOperand::Block(b1), ExecutionOperand::Address(a2)) => {
                     bytes.push(0x05);
-                    bytes.extend(b1.to_binary(&config));
+                    bytes.extend(b1.to_qcf(&config));
                     bytes.extend((*a2 as u32).to_le_bytes());
                 }
                 (ExecutionOperand::Address(a1), ExecutionOperand::Block(b2)) => {
                     bytes.push(0x06);
                     bytes.extend((*a1 as u32).to_le_bytes());
-                    bytes.extend(b2.to_binary(&config.invert()));
+                    bytes.extend(b2.to_qcf(&config.invert()));
                 }
                 (ExecutionOperand::Address(a1), ExecutionOperand::Address(a2)) => {
                     bytes.push(0x07);
@@ -192,12 +193,14 @@ impl ToBinary for OperationInstruction {
     }
 }
 
-pub struct BinaryFile {
+pub struct QcfFile {
     file: BufWriter<File>,
 }
 
-impl BinaryFile {
+impl QcfFile {
     pub fn new(path: PathBuf) -> std::io::Result<Self> {
+        // update path to use .qcf extension
+        let path = path.with_extension("qcf");
         let file = File::create(path)?;
         Ok(Self {
             file: BufWriter::new(file),
@@ -205,6 +208,6 @@ impl BinaryFile {
     }
 
     pub fn add_operation_instruction(&mut self, op: &OperationInstruction) -> std::io::Result<()> {
-        self.file.write_all(&op.to_binary(&Default::default()))
+        self.file.write_all(&op.to_qcf(&Default::default()))
     }
 }
