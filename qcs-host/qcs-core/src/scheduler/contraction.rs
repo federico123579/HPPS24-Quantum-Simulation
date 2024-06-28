@@ -10,8 +10,11 @@ use hashbrown::HashMap;
 
 use crate::{
     contractions::{TensorContraction, TensorKind},
-    model::gates::Gate,
+    executor::{BlockStore, Computation, ExecutorPlan, InstructionLike},
+    model::blocks::SpannedBlock,
 };
+
+use super::ExecutionOperand;
 
 /// A plan of instructions to be executed in the simulator
 /// The plan is a list of instructions that can be executed in parallel
@@ -65,6 +68,26 @@ impl ContractionPlan {
     /// Check if the plan is empty.
     pub fn is_empty(&self) -> bool {
         self.instructions.is_empty()
+    }
+}
+
+impl ExecutorPlan for ContractionPlan {
+    type Instruction = ContractionInstruction;
+
+    fn get_ready(&self) -> Vec<usize> {
+        self.get_ready()
+    }
+
+    fn set_done(&mut self, ids: impl IntoIterator<Item = usize>) {
+        self.set_done(ids)
+    }
+
+    fn fetch_ready(&mut self) -> Vec<Self::Instruction> {
+        self.fetch_ready()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
     }
 }
 
@@ -131,9 +154,9 @@ pub struct ContractionInstruction {
     /// The rank of the resulting tensor
     pub rank: u8,
     /// The left operand of the instruction
-    pub first: ContractionOperand,
+    pub first: ExecutionOperand<SpannedBlock>,
     /// The right operand of the instruction
-    pub second: ContractionOperand,
+    pub second: ExecutionOperand<SpannedBlock>,
 }
 
 impl ContractionInstruction {
@@ -168,9 +191,9 @@ impl ContractionInstruction {
                 dependencies.push(instr_id);
                 collaterals.push(instr);
                 available_id = collaterals.iter().map(|i| i.id).max().unwrap() + 1;
-                ContractionOperand::from(instr_id)
+                ExecutionOperand::from(instr_id)
             }
-            TensorKind::Gate(gate) => ContractionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => ExecutionOperand::Block(SpannedBlock::from(*gate)),
         };
 
         let second = match right {
@@ -180,9 +203,9 @@ impl ContractionInstruction {
                 let instr_id = instr.id;
                 dependencies.push(instr_id);
                 collaterals.push(instr);
-                ContractionOperand::from(instr_id)
+                ExecutionOperand::from(instr_id)
             }
-            TensorKind::Gate(gate) => ContractionOperand::Gate(*gate),
+            TensorKind::Gate(gate) => ExecutionOperand::Block(SpannedBlock::from(*gate)),
         };
 
         let instruction = Self {
@@ -202,6 +225,33 @@ impl ContractionInstruction {
     }
 }
 
+impl Computation for ContractionInstruction {
+    type BlockKind = SpannedBlock;
+
+    fn compute(self, block_map: &impl BlockStore<Self::BlockKind>) -> usize {
+        let ContractionInstruction {
+            id, first, second, ..
+        } = self;
+
+        let first_block = block_map.load_block(first);
+        let second_block = block_map.load_block(second);
+
+        let new_span = first_block.merged_span(&second_block);
+        let first_block = first_block.adapt_to_span(new_span.clone());
+        let second_block = second_block.adapt_to_span(new_span);
+
+        let out = first_block * second_block;
+        block_map.save_block(id, out);
+        id
+    }
+}
+
+impl InstructionLike for ContractionInstruction {
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
 impl PartialEq for ContractionInstruction {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -217,37 +267,5 @@ impl std::fmt::Display for ContractionInstruction {
             "{}: R{} - {} x {}",
             self.id, self.rank, self.first, self.second
         )
-    }
-}
-
-/// An operand of an instruction
-/// The operand can be a gate or an address in the plan (the id of the
-/// instruction).
-#[derive(Debug, Clone)]
-pub enum ContractionOperand {
-    /// A gate to be executed
-    Gate(Gate),
-    /// An blocj id in the plan
-    Address(usize),
-}
-
-impl From<Gate> for ContractionOperand {
-    fn from(gate: Gate) -> Self {
-        Self::Gate(gate)
-    }
-}
-
-impl From<usize> for ContractionOperand {
-    fn from(id: usize) -> Self {
-        Self::Address(id)
-    }
-}
-
-impl std::fmt::Display for ContractionOperand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Gate(gate) => write!(f, "g:{}", gate),
-            Self::Address(id) => write!(f, "id:{}", id),
-        }
     }
 }

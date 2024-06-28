@@ -28,6 +28,7 @@ build-release: clean
     cargo build --release --bins
     mv target/release/export qcs-export
     mv target/release/compute qcs-compute
+    mv target/release/compile qcs-compile
 
 clean:
     rm -f ./qcs-export ./qcs-compute

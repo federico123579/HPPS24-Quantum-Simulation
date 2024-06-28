@@ -4,64 +4,67 @@
 //! As for now there is only one executor, the `CpuExecutor`, which is responsible for
 //! executing the instructions on the CPU.
 
-use std::{sync::Arc, thread::JoinHandle};
+use std::{fmt::Debug, sync::Arc, thread::JoinHandle};
 
 use crossbeam::channel::unbounded;
 use dashmap::{DashMap, DashSet};
 
-use crate::{
-    model::blocks::SpannedBlock,
-    scheduler::contraction::{ContractionInstruction, ContractionOperand, ContractionPlan},
-};
+use crate::{model::blocks::BlockLike, scheduler::ExecutionOperand};
 
-/// The `CpuExecutor` is responsible for executing the instructions on the CPU.
-#[derive(Debug, Default)]
-pub struct CpuExecutor {
-    /// The memory of the executor, which is a map from the id of the block to the block itself.
-    memory: Arc<DashMap<usize, SpannedBlock>>,
-    threads: Vec<JoinHandle<()>>,
+pub trait InstructionLike: Computation + Debug {
+    fn id(&self) -> usize;
 }
 
-trait BlockStore {
-    fn load_block(&self, operand: ContractionOperand) -> SpannedBlock;
-    fn save_block(&self, id: usize, block: SpannedBlock);
-    fn prepare_computation(&self, instruction: ContractionInstruction) -> Computation;
+pub trait ExecutorPlan {
+    type Instruction: InstructionLike;
+
+    fn get_ready(&self) -> Vec<usize>;
+    fn set_done(&mut self, ids: impl IntoIterator<Item = usize>);
+    fn fetch_ready(&mut self) -> Vec<Self::Instruction>;
+    fn is_empty(&self) -> bool;
 }
 
-impl BlockStore for DashMap<usize, SpannedBlock> {
+pub trait BlockStore<B: BlockLike> {
+    fn load_block(&self, operand: ExecutionOperand<B>) -> B;
+    fn save_block(&self, id: usize, block: B);
+    // fn prepare_computation(&self, instruction: ContractionInstruction) -> Computation;
+}
+
+impl<B: BlockLike> BlockStore<B> for DashMap<usize, B> {
     /// Loads a block from memory or from the instruction.
     #[inline]
-    fn load_block(&self, instruction: ContractionOperand) -> SpannedBlock {
+    fn load_block(&self, instruction: ExecutionOperand<B>) -> B {
         match instruction {
-            ContractionOperand::Gate(gate) => gate.into(),
-            ContractionOperand::Address(address) => self.remove(&address).unwrap().1,
+            ExecutionOperand::Block(block) => block,
+            ExecutionOperand::Address(id) => self.remove(&id).unwrap().1,
         }
     }
 
     /// Saves a block in memory.
     #[inline]
-    fn save_block(&self, id: usize, block: SpannedBlock) {
+    fn save_block(&self, id: usize, block: B) {
         self.insert(id, block);
-    }
-
-    /// Prepare the execution of a single instruction.
-    fn prepare_computation(&self, instruction: ContractionInstruction) -> Computation {
-        let ContractionInstruction {
-            id, first, second, ..
-        } = instruction;
-
-        let first_block = self.load_block(first);
-        let second_block = self.load_block(second);
-
-        Computation {
-            wid: id,
-            block1: first_block,
-            block2: second_block,
-        }
     }
 }
 
-impl CpuExecutor {
+pub trait Computation {
+    type BlockKind: BlockLike;
+
+    fn compute(self, block_map: &impl BlockStore<Self::BlockKind>) -> usize;
+}
+
+/// The `CpuExecutor` is responsible for executing the instructions on the CPU.
+#[derive(Debug, Default)]
+pub struct CpuExecutor<B: BlockLike> {
+    /// The memory of the executor, which is a map from the id of the block to the block itself.
+    memory: Arc<DashMap<usize, B>>,
+    threads: Vec<JoinHandle<()>>,
+}
+
+impl<B> CpuExecutor<B>
+where
+    B: BlockLike + Send + Sync + 'static,
+{
     /// Creates a new `CpuExecutor`.
     pub fn new() -> Self {
         Self {
@@ -86,7 +89,11 @@ impl CpuExecutor {
     }
 
     /// Execute a contraction plan, in parallel.
-    pub fn execute(mut self, mut plan: ContractionPlan) -> Vec<SpannedBlock> {
+    pub fn execute<E, I>(mut self, mut plan: E) -> Vec<B>
+    where
+        I: Computation<BlockKind = B> + InstructionLike + Send + 'static,
+        E: ExecutorPlan<Instruction = I> + Send + 'static,
+    {
         // create a channel to communicate the need of more instructions
         let (wtx, wrx) = unbounded();
         let (itx, irx) = unbounded();
@@ -96,7 +103,7 @@ impl CpuExecutor {
         // spawn a thread that fills the queue with the ready instructions
         self.spawn(move || {
             for instruction in plan.fetch_ready() {
-                executing.insert(instruction.id);
+                executing.insert(instruction.id());
                 itx.send(instruction).unwrap();
             }
             while let Ok(id) = wrx.recv() {
@@ -104,7 +111,7 @@ impl CpuExecutor {
                 for instruction in plan
                     .fetch_ready()
                     .into_iter()
-                    .filter(|i| executing.insert(i.id))
+                    .filter(|i| executing.insert(i.id()))
                 {
                     itx.send(instruction).unwrap();
                 }
@@ -121,9 +128,7 @@ impl CpuExecutor {
             let block_map = Arc::clone(&self.memory);
             self.spawn(move || {
                 while let Ok(instruction) = irx_clone.recv() {
-                    let computation = block_map.prepare_computation(instruction);
-                    let (id, result) = computation.compute();
-                    block_map.save_block(id, result);
+                    let id = instruction.compute(&*block_map);
                     if wtx_clone.send(id).is_err() {
                         break;
                     }
@@ -139,20 +144,5 @@ impl CpuExecutor {
             .into_iter()
             .map(|(_, block)| block)
             .collect()
-    }
-}
-
-struct Computation {
-    wid: usize,
-    block1: SpannedBlock,
-    block2: SpannedBlock,
-}
-
-impl Computation {
-    fn compute(self) -> (usize, SpannedBlock) {
-        let new_span = self.block1.merged_span(&self.block2);
-        let first_block = self.block1.adapt_to_span(new_span.clone());
-        let second_block: SpannedBlock = self.block2.adapt_to_span(new_span);
-        (self.wid, first_block * second_block)
     }
 }

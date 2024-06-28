@@ -7,9 +7,14 @@
 //! return the instructions in the order they can be executed.
 
 use hashbrown::HashMap;
-use nalgebra::{Complex, DMatrix};
 
-use crate::{model::gates::QuantumGate, op_tree};
+use crate::{
+    executor::{BlockStore, Computation, ExecutorPlan, InstructionLike},
+    model::{blocks::Block, gates::QuantumGate, TensorProduct},
+    op_tree,
+};
+
+use super::ExecutionOperand;
 
 /// A plan of instructions to be executed in the simulator
 /// The plan is a list of instructions that can be executed in parallel
@@ -66,6 +71,26 @@ impl OperationPlan {
     }
 }
 
+impl ExecutorPlan for OperationPlan {
+    type Instruction = OperationInstruction;
+
+    fn get_ready(&self) -> Vec<usize> {
+        self.get_ready()
+    }
+
+    fn set_done(&mut self, ids: impl IntoIterator<Item = usize>) {
+        self.set_done(ids)
+    }
+
+    fn fetch_ready(&mut self) -> Vec<Self::Instruction> {
+        self.fetch_ready()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
 impl From<op_tree::Operation> for OperationPlan {
     fn from(value: op_tree::Operation) -> Self {
         let mut builder = OperationPlanBuilder::default();
@@ -110,7 +135,7 @@ impl OperationPlanBuilder {
             inner,
             transposed_op,
         } = operation;
-        let address = match inner {
+        match inner {
             op_tree::OperationKind::TensorExpansion {
                 target_span,
                 operand,
@@ -121,17 +146,18 @@ impl OperationPlanBuilder {
                     op_tree::Operand::Operation(op) => {
                         let dep = self.populate(*op);
                         dependencies.push(dep);
-                        KernelOperand::Address(dep)
+                        ExecutionOperand::Address(dep)
                     }
-                    op_tree::Operand::Gate(gate) => KernelOperand::from(gate.matrix()),
+                    op_tree::Operand::Gate(gate) => {
+                        ExecutionOperand::from(Block::from(gate.matrix()))
+                    }
                 };
 
                 let id_dim = op_span.start() - target_span.start();
-                let id_matrix = DMatrix::identity(id_dim, id_dim);
-                let left = KernelOperand::from(id_matrix);
-                let id = self.new_id();
+                let left = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
+                let first_id = self.new_id();
                 let first_te = OperationInstruction {
-                    id,
+                    id: first_id,
                     dependencies,
                     kernel: Kernel::TE { left, right: op },
                     left_format: if transposed_op {
@@ -142,14 +168,13 @@ impl OperationPlanBuilder {
                 };
                 self.instructions.push(first_te);
 
-                let left = KernelOperand::Address(id);
+                let left = ExecutionOperand::Address(first_id);
                 let id_dim = target_span.end() - op_span.end();
-                let id_matrix = DMatrix::identity(id_dim, id_dim);
-                let right = KernelOperand::from(id_matrix);
+                let right = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
                 let id = self.new_id();
                 let second_te = OperationInstruction {
                     id,
-                    dependencies: vec![id],
+                    dependencies: vec![first_id],
                     kernel: Kernel::TE { left, right },
                     left_format: SerializeFormat::ColumnMajor,
                 };
@@ -162,17 +187,17 @@ impl OperationPlanBuilder {
                     op_tree::Operand::Operation(op) => {
                         let dep = self.populate(*op);
                         dependencies.push(dep);
-                        KernelOperand::Address(dep)
+                        ExecutionOperand::Address(dep)
                     }
-                    op_tree::Operand::Gate(gate) => KernelOperand::from(gate.as_ref().matrix()),
+                    op_tree::Operand::Gate(gate) => ExecutionOperand::from(Block::from(*gate)),
                 };
                 let right = match right {
                     op_tree::Operand::Operation(op) => {
                         let dep = self.populate(*op);
                         dependencies.push(dep);
-                        KernelOperand::Address(dep)
+                        ExecutionOperand::Address(dep)
                     }
-                    op_tree::Operand::Gate(gate) => KernelOperand::from(gate.as_ref().matrix()),
+                    op_tree::Operand::Gate(gate) => ExecutionOperand::from(Block::from(*gate)),
                 };
                 let id = self.new_id();
                 let mm = OperationInstruction {
@@ -188,8 +213,7 @@ impl OperationPlanBuilder {
                 self.instructions.push(mm);
                 id
             }
-        };
-        address
+        }
     }
 
     fn build(self) -> OperationPlan {
@@ -228,6 +252,34 @@ pub struct OperationInstruction {
     pub left_format: SerializeFormat,
 }
 
+impl Computation for OperationInstruction {
+    type BlockKind = Block;
+
+    fn compute(self, block_map: &impl BlockStore<Self::BlockKind>) -> usize {
+        match self.kernel {
+            Kernel::TE { left, right } => {
+                let left = block_map.load_block(left);
+                let right = block_map.load_block(right);
+                let result = left.tensor_product(right);
+                block_map.save_block(self.id, result);
+            }
+            Kernel::MM { left, right } => {
+                let left = block_map.load_block(left);
+                let right = block_map.load_block(right);
+                let result = left * right;
+                block_map.save_block(self.id, result);
+            }
+        }
+        self.id
+    }
+}
+
+impl InstructionLike for OperationInstruction {
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
 impl PartialEq for OperationInstruction {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -251,12 +303,12 @@ pub enum SerializeFormat {
 #[derive(Debug, Clone)]
 pub enum Kernel {
     TE {
-        left: KernelOperand,
-        right: KernelOperand,
+        left: ExecutionOperand<Block>,
+        right: ExecutionOperand<Block>,
     },
     MM {
-        left: KernelOperand,
-        right: KernelOperand,
+        left: ExecutionOperand<Block>,
+        right: ExecutionOperand<Block>,
     },
 }
 
@@ -265,33 +317,6 @@ impl std::fmt::Display for Kernel {
         match &self {
             Self::TE { left, right } => write!(f, "{}⊗ {}", left, right),
             Self::MM { left, right } => write!(f, "{}⊙ {}", left, right),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum KernelOperand {
-    Address(usize),
-    Matrix(DMatrix<Complex<f64>>),
-}
-
-impl From<DMatrix<Complex<f64>>> for KernelOperand {
-    fn from(matrix: DMatrix<Complex<f64>>) -> Self {
-        Self::Matrix(matrix)
-    }
-}
-
-impl From<usize> for KernelOperand {
-    fn from(id: usize) -> Self {
-        Self::Address(id)
-    }
-}
-
-impl std::fmt::Display for KernelOperand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::Matrix(matrix) => write!(f, "M({:02}x{:02})", matrix.nrows(), matrix.ncols()),
-            Self::Address(id) => write!(f, "I({:05})", id),
         }
     }
 }

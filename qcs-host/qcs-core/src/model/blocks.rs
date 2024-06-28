@@ -6,7 +6,7 @@
 //! methods for tensor product and matrix multiplication, while keeping track of
 //! the span of the block.
 
-use std::ops::Mul;
+use std::{fmt::Debug, ops::Mul};
 
 use nalgebra::{Complex, DMatrix};
 
@@ -216,6 +216,12 @@ impl SpannedBlock {
     }
 }
 
+impl AsRef<DMatrix<Complex<f64>>> for SpannedBlock {
+    fn as_ref(&self) -> &DMatrix<Complex<f64>> {
+        self.block.as_ref()
+    }
+}
+
 impl std::fmt::Display for SpannedBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SpannedBlock{}:\n{}", self.span, self.block)
@@ -261,5 +267,21 @@ impl Mul<SpannedBlock> for SpannedBlock {
             block: &self.block * &rhs.block,
             span: self.span.union(&rhs.span),
         }
+    }
+}
+
+pub trait BlockLike: Debug + Clone + PartialEq + AsRef<DMatrix<Complex<f64>>> {
+    fn into_block(self) -> Block;
+}
+
+impl BlockLike for SpannedBlock {
+    fn into_block(self) -> Block {
+        self.into_block()
+    }
+}
+
+impl BlockLike for Block {
+    fn into_block(self) -> Block {
+        self
     }
 }

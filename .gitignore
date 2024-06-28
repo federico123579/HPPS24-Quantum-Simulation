@@ -8,3 +8,4 @@ target/
 .venv/
 .ipynb_checkpoints/
 qcs-host/Cargo.lock
+qcs-host/qcs-compile
