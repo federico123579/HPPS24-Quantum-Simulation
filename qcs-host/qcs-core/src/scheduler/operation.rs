@@ -153,33 +153,49 @@ impl OperationPlanBuilder {
                     }
                 };
 
+                // Create the first tensor expansion if needed
                 let id_dim = op_span.start() - target_span.start();
-                let left = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
-                let first_id = self.new_id();
-                let first_te = OperationInstruction {
-                    id: first_id,
-                    dependencies,
-                    kernel: Kernel::TE { left, right: op },
-                    left_format: if transposed_op {
-                        MatrixFormat::ColumnMajor
-                    } else {
-                        MatrixFormat::RowMajor
-                    },
+                let (left_id, left, dependencies) = if id_dim != 0 {
+                    let left = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
+                    let id = self.new_id();
+                    let first_te = OperationInstruction {
+                        id,
+                        dependencies,
+                        kernel: Kernel::TE {
+                            left,
+                            right: op.clone(),
+                        },
+                        left_format: if transposed_op {
+                            MatrixFormat::ColumnMajor
+                        } else {
+                            MatrixFormat::RowMajor
+                        },
+                    };
+                    self.instructions.push(first_te);
+                    (Some(id), ExecutionOperand::Address(id), vec![id])
+                } else {
+                    (None, op, dependencies)
                 };
-                self.instructions.push(first_te);
 
-                let left = ExecutionOperand::Address(first_id);
+                // Create the second tensor expansion if needed
                 let id_dim = target_span.end() - op_span.end();
-                let right = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
-                let id = self.new_id();
-                let second_te = OperationInstruction {
-                    id,
-                    dependencies: vec![first_id],
-                    kernel: Kernel::TE { left, right },
-                    left_format: MatrixFormat::ColumnMajor,
+                let right_id = if id_dim != 0 {
+                    let right = ExecutionOperand::from(Block::identity(2usize.pow(id_dim as u32)));
+                    let id = self.new_id();
+                    let second_te = OperationInstruction {
+                        id,
+                        dependencies,
+                        kernel: Kernel::TE { left, right },
+                        left_format: MatrixFormat::ColumnMajor,
+                    };
+                    self.instructions.push(second_te);
+                    Some(id)
+                } else {
+                    None
                 };
-                self.instructions.push(second_te);
-                id
+
+                // Return the id of the last tensor expansion
+                right_id.unwrap_or_else(|| left_id.unwrap())
             }
             op_tree::OperationKind::MatrixMultiplication { left, right } => {
                 let mut dependencies = Vec::new();

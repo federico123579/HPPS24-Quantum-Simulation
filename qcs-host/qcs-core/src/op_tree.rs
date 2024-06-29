@@ -6,6 +6,7 @@ use crate::{
     },
 };
 
+#[derive(Debug, Clone)]
 pub struct Operation {
     pub inner: OperationKind,
     /// flag indicating if it's the right operand of a matrix multiplication,
@@ -13,11 +14,13 @@ pub struct Operation {
     pub transposed_op: bool,
 }
 
+#[derive(Debug, Clone)]
 pub enum OperationKind {
     TensorExpansion { target_span: Span, operand: Operand },
     MatrixMultiplication { left: Operand, right: Operand },
 }
 
+#[derive(Debug, Clone)]
 pub enum Operand {
     Operation(Box<Operation>),
     Gate(Box<Gate>),
@@ -63,7 +66,7 @@ impl Operation {
             ..
         } = contr;
 
-        let left = if span != left.span() {
+        let left = if span.filled() != left.span().filled() {
             Operand::Operation(Box::new(Operation {
                 inner: OperationKind::TensorExpansion {
                     target_span: span.clone(),
@@ -75,7 +78,7 @@ impl Operation {
             Operand::from_tensor_kind(left, transposed_op)
         };
 
-        let right = if span != right.span() {
+        let right = if span.filled() != right.span().filled() {
             Operand::Operation(Box::new(Operation {
                 inner: OperationKind::TensorExpansion {
                     target_span: span,

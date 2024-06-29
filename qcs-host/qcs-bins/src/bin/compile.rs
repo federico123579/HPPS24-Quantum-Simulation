@@ -6,7 +6,7 @@ use qcs_core::{
     compiler::QcfFile,
     contractions::{TensorKind, TensorNetwork},
     executor::{CpuExecutor, InstructionLike},
-    model::{blocks::BlockLike, gates::QuantumGate, QRegister, Qubit, TensorProduct},
+    model::{blocks::BlockLike, gates::QuantumGate, TensorProduct},
     op_tree,
     scheduler::OperationPlan,
 };
@@ -62,9 +62,5 @@ fn main() {
         Some(acc) => Some(acc.tensor_product(block)),
     });
 
-    let inr = QRegister::from((0..circuit.n_qubits).map(|_| Qubit::zero()));
-    if let Some(eval) = eval {
-        let qstate_2 = eval.into_block() * inr;
-        println!("{}", qstate_2.distr());
-    }
+    println!("Final Block:\n{}", eval.unwrap().into_block());
 }
