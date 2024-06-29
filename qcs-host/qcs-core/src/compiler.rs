@@ -61,6 +61,8 @@ fn count_non_zero(matrix: &DMatrix<Complex<f64>>) -> usize {
 
 /// Binary format for matrices (sparse COO format):
 /// - 4 bytes: number of non zero elements (u32)
+/// - 1 byte: rank of tensor (1: 2x2, 2: 4x4, 3:8x8, ...) (u8)
+/// - 1 byte for column major or row major (u8) (0: row major, 1: column major)
 /// - for each element:
 ///     - 4 bytes: row index (u32)
 ///     - 4 bytes: column index (u32)
@@ -70,6 +72,11 @@ impl ToQcf for DMatrix<Complex<f64>> {
     fn to_qcf(&self, config: &QcfConfig) -> Vec<u8> {
         let mut bytes = vec![];
         bytes.extend_from_slice(&(count_non_zero(self) as u32).to_le_bytes());
+        bytes.push((self.nrows() as f64).log2().round() as u8);
+        bytes.push(match config.matrix_format {
+            MatrixFormat::RowMajor => 0x00,
+            MatrixFormat::ColumnMajor => 0x01,
+        });
         match config.matrix_format {
             MatrixFormat::RowMajor => {
                 self.row_iter().enumerate().for_each(|(i, row)| {
@@ -88,7 +95,7 @@ impl ToQcf for DMatrix<Complex<f64>> {
                 self.column_iter().enumerate().for_each(|(j, col)| {
                     col.iter()
                         .enumerate()
-                        .filter(|(_, c)| c.norm() > 1e-10)
+                        .filter(|(_, c)| c.norm() > ZERO_THRESHOLD)
                         .for_each(|(i, c)| {
                             bytes.extend_from_slice(&(i as u32).to_le_bytes());
                             bytes.extend_from_slice(&(j as u32).to_le_bytes());

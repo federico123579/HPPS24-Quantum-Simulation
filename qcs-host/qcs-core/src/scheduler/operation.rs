@@ -102,7 +102,9 @@ impl From<op_tree::Operation> for OperationPlan {
 impl std::fmt::Display for OperationPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Instructions:")?;
-        for (_, instr) in &self.instructions {
+        let mut instructions = self.instructions.values().collect::<Vec<_>>();
+        instructions.sort_by_key(|instr| instr.id);
+        for instr in instructions {
             writeln!(f, "{}", instr)?;
         }
         writeln!(f, "Waiting dependencies:")?;
@@ -186,7 +188,11 @@ impl OperationPlanBuilder {
                         id,
                         dependencies,
                         kernel: Kernel::TE { left, right },
-                        left_format: MatrixFormat::ColumnMajor,
+                        left_format: if transposed_op {
+                            MatrixFormat::ColumnMajor
+                        } else {
+                            MatrixFormat::RowMajor
+                        },
                     };
                     self.instructions.push(second_te);
                     Some(id)
@@ -306,7 +312,11 @@ impl Eq for OperationInstruction {}
 
 impl std::fmt::Display for OperationInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:03}: {}", self.id, self.kernel)
+        write!(
+            f,
+            "{:03}: {} - ({:?})",
+            self.id, self.kernel, self.left_format
+        )
     }
 }
 
