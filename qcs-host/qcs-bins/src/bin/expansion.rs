@@ -1,9 +1,12 @@
 use std::path::PathBuf;
 
-use qcs_bins::{BinFile, TECompatible};
-use qcs_core::model::gates::{
-    Fredkin, Gate, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Swap, Toffoli, CH, CP, CRX,
-    CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, SX, U, U1, U2, U3,
+use qcs_bins::{BinFile, TECompatible, TE};
+use qcs_core::model::{
+    gates::{
+        Fredkin, Gate, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Swap, Toffoli, CH, CP,
+        CRX, CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, SX, U, U1, U2, U3,
+    },
+    TensorProduct,
 };
 
 fn main() {
@@ -58,6 +61,11 @@ fn main() {
         println!("{}: {}", i * 4 + 3, te4);
         bfile.add(te4).unwrap();
     }
+
+    let big_te = U::new(1.0, 2.0, 3.0, 0).tensor_product(U::new(1.0, 2.0, 3.0, 0));
+    let big_te = TE::new(big_te.clone().into_matrix(), big_te.into_matrix());
+    println!("big: {}", big_te);
+    bfile.add(big_te).unwrap();
 
     println!("Done!");
 }
