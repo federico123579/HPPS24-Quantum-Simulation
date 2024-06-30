@@ -13,3 +13,4 @@ nalgebra.workspace = true
 rusqlite = "0.31.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+csv = "1.3.0"
