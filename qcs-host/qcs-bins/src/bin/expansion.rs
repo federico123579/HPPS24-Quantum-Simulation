@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use qcs_bins::{BinFile, TECompatible, TE};
 use qcs_core::model::{
     gates::{
-        Fredkin, Gate, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, Swap, Toffoli, CH, CP,
-        CRX, CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, SX, U, U1, U2, U3,
+        Fredkin, Gate, Hadamard, Identity, PauliX, PauliY, PauliZ, Phase, QuantumGate, Swap,
+        Toffoli, CH, CP, CRX, CRY, CRZ, CU, CX, CY, CZ, RX, RY, RZ, SX, U, U1, U2, U3,
     },
     TensorProduct,
 };
@@ -42,30 +42,90 @@ fn main() {
         Gate::from(U::new(1.0, 2.0, 3.0, 0)),
     ];
 
+    println!("Golden vectors:");
     let mut bfile = BinFile::new(PathBuf::from("golden-vectors.dat")).unwrap();
+    let mut j = 0;
 
-    for (gate, i) in gates.into_iter().zip(0..) {
+    // test all gates with all possible expansions
+    for (gate, _) in gates.into_iter().zip(0..) {
         let te1 = gate.left_te(1);
-        println!("{}: {}", i * 4, te1);
+        println!("{}: {}", j, te1);
+        j += 1;
         bfile.add(te1).unwrap();
 
         let te2 = gate.left_te(2);
-        println!("{}: {}", i * 4 + 1, te2);
+        println!("{}: {}", j, te2);
+        j += 1;
         bfile.add(te2).unwrap();
 
         let te3 = gate.right_te(1);
-        println!("{}: {}", i * 4 + 2, te3);
+        println!("{}: {}", j, te3);
+        j += 1;
         bfile.add(te3).unwrap();
 
         let te4 = gate.right_te(2);
-        println!("{}: {}", i * 4 + 3, te4);
+        println!("{}: {}", j, te4);
+        j += 1;
         bfile.add(te4).unwrap();
     }
 
+    // test tensor product with a non-sparse matrix
     let big_te = U::new(1.0, 2.0, 3.0, 0).tensor_product(U::new(1.0, 2.0, 3.0, 0));
     let big_te = TE::new(big_te.clone().into_matrix(), big_te.into_matrix());
-    println!("big: {}", big_te);
+    println!("{} - big: {}", j, big_te);
+    j += 1;
     bfile.add(big_te).unwrap();
+
+    println!("Sparse stress test:");
+    j = 0;
+    let mut bfile = BinFile::new(PathBuf::from("sparse_stress.dat")).unwrap();
+
+    // test tensor product with sparse matrices larger and larger
+    for i in 1..=13 {
+        let block = (1..i).fold(PauliX::new(0).block(), |a, _| {
+            a.tensor_product(Identity::new(0))
+        });
+        let te = TE::new(
+            block.clone().into_matrix(),
+            Identity::new(0).block().into_matrix(),
+        );
+        println!("{} - sparse {}: {}", j, i, te);
+        j += 1;
+        bfile.add(te).unwrap();
+        let te = TE::new(
+            Identity::new(0).block().into_matrix(),
+            block.clone().into_matrix(),
+        );
+        println!("{} - sparse {}: {}", j, i, te);
+        j += 1;
+
+        bfile.add(te).unwrap();
+    }
+
+    println!("Dense stress test:");
+    j = 0;
+    let mut bfile = BinFile::new(PathBuf::from("dense_stress.dat")).unwrap();
+
+    // test tensor product with dense matrices larger and larger
+    for i in 1..=6 {
+        let block = (1..i).fold(Hadamard::new(0).block(), |a, _| {
+            a.tensor_product(Hadamard::new(0))
+        });
+        let te = TE::new(
+            block.clone().into_matrix(),
+            Hadamard::new(0).block().into_matrix(),
+        );
+        println!("{} - dense {}: {}", j, i, te);
+        j += 1;
+        bfile.add(te).unwrap();
+        let te = TE::new(
+            Hadamard::new(0).block().into_matrix(),
+            block.clone().into_matrix(),
+        );
+        println!("{} - dense {}: {}", j, i, te);
+        j += 1;
+        bfile.add(te).unwrap();
+    }
 
     println!("Done!");
 }
