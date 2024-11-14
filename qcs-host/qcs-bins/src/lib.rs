@@ -29,16 +29,66 @@ impl Serialize for DMatrix<Complex<f64>> {
     }
 }
 
-pub struct TE {
+pub struct LeftTP {
     pub left: DMatrix<Complex<f64>>,
+    pub column_major: bool,
+}
+
+impl LeftTP {
+    pub fn new(left: DMatrix<Complex<f64>>) -> Self {
+        Self {
+            left,
+            column_major: false,
+        }
+    }
+
+    pub fn column_major(mut self) -> Self {
+        self.column_major = true;
+        self
+    }
+
+    pub fn compute(&self) -> DMatrix<Complex<f64>> {
+        self.left.kronecker(&DMatrix::identity(2, 2))
+    }
+}
+
+impl Serialize for LeftTP {
+    fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.push(0x00); // magic number for TE
+        if !self.column_major {
+            bytes.push(0x00); // magic number for row major
+            bytes.extend_from_slice(&self.left.serialize());
+            bytes.extend_from_slice(&self.compute().serialize());
+            bytes
+        } else {
+            bytes.push(0xff); // magic number for column major
+            bytes.extend_from_slice(&self.left.transpose().serialize());
+            bytes.extend_from_slice(&self.compute().transpose().serialize());
+            bytes
+        }
+    }
+}
+
+impl std::fmt::Display for LeftTP {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LTP: {} x I(2x2) = {}",
+            count_non_zero(&self.left),
+            count_non_zero(&self.compute())
+        )
+    }
+}
+
+pub struct RightTP {
     pub right: DMatrix<Complex<f64>>,
     pub column_major: bool,
 }
 
-impl TE {
-    pub fn new(left: DMatrix<Complex<f64>>, right: DMatrix<Complex<f64>>) -> Self {
+impl RightTP {
+    pub fn new(right: DMatrix<Complex<f64>>) -> Self {
         Self {
-            left,
             right,
             column_major: false,
         }
@@ -49,49 +99,22 @@ impl TE {
         self
     }
 
-    pub fn id(size: usize) -> DMatrix<Complex<f64>> {
-        let size = size * 2;
-        DMatrix::from_iterator(
-            size,
-            size,
-            (0..size).flat_map(|i| {
-                (0..size).map(move |j| {
-                    if i == j {
-                        Complex::new(1.0, 0.0)
-                    } else {
-                        Complex::new(0.0, 0.0)
-                    }
-                })
-            }),
-        )
-    }
-
-    pub fn with_left_id(id_size: usize, right: DMatrix<Complex<f64>>) -> Self {
-        Self::new(Self::id(id_size), right)
-    }
-
-    pub fn with_right_id(left: DMatrix<Complex<f64>>, id_size: usize) -> Self {
-        Self::new(left, Self::id(id_size))
-    }
-
     pub fn compute(&self) -> DMatrix<Complex<f64>> {
-        self.left.kronecker(&self.right)
+        DMatrix::identity(2, 2).kronecker(&self.right)
     }
 }
 
-impl Serialize for TE {
+impl Serialize for RightTP {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
-        bytes.push(0x00); // magic number for TE
+        bytes.push(0x01); // magic number for TE
         if !self.column_major {
             bytes.push(0x00); // magic number for row major
-            bytes.extend_from_slice(&self.left.serialize());
             bytes.extend_from_slice(&self.right.serialize());
             bytes.extend_from_slice(&self.compute().serialize());
             bytes
         } else {
             bytes.push(0xff); // magic number for column major
-            bytes.extend_from_slice(&self.left.transpose().serialize());
             bytes.extend_from_slice(&self.right.transpose().serialize());
             bytes.extend_from_slice(&self.compute().transpose().serialize());
             bytes
@@ -99,12 +122,11 @@ impl Serialize for TE {
     }
 }
 
-impl std::fmt::Display for TE {
+impl std::fmt::Display for RightTP {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "TE: {} x {} = {}",
-            count_non_zero(&self.left),
+            "RTP: I(2x2) x {} = {}",
             count_non_zero(&self.right),
             count_non_zero(&self.compute())
         )
@@ -112,11 +134,11 @@ impl std::fmt::Display for TE {
 }
 
 pub trait TECompatible: MatrixCompatible {
-    fn left_te(&self, id_size: usize) -> TE {
-        TE::with_left_id(id_size, self.as_matrix())
+    fn left_te(&self) -> LeftTP {
+        LeftTP::new(self.as_matrix())
     }
-    fn right_te(&self, id_size: usize) -> TE {
-        TE::with_right_id(self.as_matrix(), id_size)
+    fn right_te(&self) -> RightTP {
+        RightTP::new(self.as_matrix())
     }
 }
 
@@ -150,7 +172,7 @@ impl Matmul {
 impl Serialize for Matmul {
     fn serialize(&self) -> Vec<u8> {
         let mut bytes = vec![];
-        bytes.push(0xff); // magic number for matmul
+        bytes.push(0x02); // magic number for matmul
         if !self.column_major {
             bytes.push(0x00); // magic number for row major
             bytes.extend_from_slice(&self.left.serialize());
