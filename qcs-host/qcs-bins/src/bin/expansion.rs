@@ -69,6 +69,21 @@ fn main() {
         bfile.add(te4).unwrap();
     }
 
+    // test tensor product with dense matrices larger and larger
+    for i in 2..6 {
+        let block = (1..i).fold(Hadamard::new(0).block(), |a, _| {
+            a.tensor_product(Hadamard::new(0))
+        });
+        let te = LeftTP::new(block.clone().into_matrix());
+        println!("{} - dense {}: {}", j, i, te);
+        j += 1;
+        bfile.add(te).unwrap();
+        let te = RightTP::new(block.clone().into_matrix());
+        println!("{} - dense {}: {}", j, i, te);
+        j += 1;
+        bfile.add(te).unwrap();
+    }
+
     println!("Sparse stress test:");
     j = 0;
     let mut bfile = BinFile::new(PathBuf::from("sparse_stress.dat")).unwrap();
